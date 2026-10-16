@@ -1,13 +1,17 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const $ = (id) => document.getElementById(id);
 
-const configured =
-  window.LABEL_AWADH_SUPABASE_URL?.startsWith('https://') &&
-  !window.LABEL_AWADH_SUPABASE_URL.includes('PASTE_') &&
-  window.LABEL_AWADH_SUPABASE_KEY &&
-  !window.LABEL_AWADH_SUPABASE_KEY.includes('PASTE_');
+const SUPABASE_URL = window.LABEL_AWADH_SUPABASE_URL;
+const SUPABASE_KEY = window.LABEL_AWADH_SUPABASE_KEY;
+
+const configured = Boolean(
+  SUPABASE_URL &&
+  SUPABASE_URL.startsWith('https://') &&
+  SUPABASE_KEY &&
+  !SUPABASE_URL.includes('PASTE_') &&
+  !SUPABASE_KEY.includes('PASTE_')
+);
 
 let supabase = null;
 let currentTab = 'overview';
@@ -15,51 +19,52 @@ let selectedImageFile = null;
 let previewObjectUrl = null;
 
 const statusOptions = [
-  'pending', 'confirmed', 'processing',
-  'shipped', 'delivered', 'cancelled'
+  'pending',
+  'confirmed',
+  'processing',
+  'shipped',
+  'delivered',
+  'cancelled'
 ];
 
-if (!configured) {
-  if ($('setupNotice')) {
-    $('setupNotice').classList.remove('hidden');
-    $('setupNotice').innerHTML =
-      '<b>Setup required:</b> Check public/admin/config.js. Never use a service_role key here.';
-  }
+/* ---------- INITIAL CONFIGURATION ---------- */
+
+if (configured) {
+  supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
   if ($('connectionState')) {
-    $('connectionState').textContent = 'Setup required';
+    $('connectionState').textContent = 'Connected';
   }
 } else {
-  supabase = createClient(
-    window.LABEL_AWADH_SUPABASE_URL,
-    window.LABEL_AWADH_SUPABASE_KEY
-  );
-
   if ($('connectionState')) {
-    $('connectionState').textContent = 'Configured';
+    $('connectionState').textContent = 'Not connected';
+  }
+
+  if ($('setupNotice')) {
+    $('setupNotice').classList.remove('hidden');
+    $('setupNotice').textContent =
+      'Please check the Supabase URL and publishable/anon key in config.js.';
   }
 }
 
 /* ---------- HELPERS ---------- */
 
-function money(value, alreadyPaise = false) {
-  const amount = Number(value) || 0;
-
+function money(value) {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
-    maximumFractionDigits: 0
-  }).format(alreadyPaise ? amount / 100 : amount);
+    maximumFractionDigits: 2
+  }).format(Number(value) || 0);
 }
 
 function esc(value = '') {
-  return String(value).replace(/[&<>"']/g, c => ({
+  return String(value).replace(/[&<>"']/g, char => ({
     '&': '&amp;',
     '<': '&lt;',
     '>': '&gt;',
     '"': '&quot;',
     "'": '&#39;'
-  })[c]);
+  })[char]);
 }
 
 function toast(message) {
@@ -76,44 +81,7 @@ function toast(message) {
   }, 2800);
 }
 
-/* ---------- NAVIGATION ---------- */
-
-function showTab(tab) {
-  currentTab = tab;
-
-  document.querySelectorAll('.nav').forEach(button => {
-    button.classList.toggle('active', button.dataset.tab === tab);
-  });
-
-  ['overview', 'products', 'orders'].forEach(name => {
-    if ($(name + 'Tab')) {
-      $(name + 'Tab').classList.toggle('hidden', name !== tab);
-    }
-  });
-
-  if ($('pageTitle')) {
-    $('pageTitle').textContent =
-      tab.charAt(0).toUpperCase() + tab.slice(1);
-  }
-
-  if (tab === 'overview') loadOverview();
-  if (tab === 'products') loadProducts();
-  if (tab === 'orders') loadOrders();
-}
-
-document.querySelectorAll('.nav').forEach(button => {
-  button.addEventListener('click', () => {
-    showTab(button.dataset.tab);
-  });
-});
-
-document.querySelectorAll('[data-goto]').forEach(button => {
-  button.addEventListener('click', () => {
-    showTab(button.dataset.goto);
-  });
-});
-
-/* ---------- LOGIN AND ADMIN ACCESS ---------- */
+/* ---------- LOGIN ---------- */
 
 function showLogin(message = '') {
   $('loginPanel')?.classList.remove('hidden');
@@ -142,55 +110,64 @@ function showApp(email) {
 }
 
 async function requireAdmin() {
-  if (!supabase) return;
-
-  const {
-    data: { session },
-    error: sessionError
-  } = await supabase.auth.getSession();
-
-  if (sessionError || !session) {
-    showLogin();
+  if (!supabase) {
+    showLogin('Supabase configuration is missing. Check config.js.');
     return;
   }
 
-  const { data, error } = await supabase
-    .from('admin_users')
-    .select('user_id')
-    .eq('user_id', session.user.id)
-    .maybeSingle();
+  try {
+    const {
+      data: { session },
+      error: sessionError
+    } = await supabase.auth.getSession();
 
-  if (error || !data) {
-    await supabase.auth.signOut();
+    if (sessionError || !session) {
+      showLogin();
+      return;
+    }
 
-    showLogin(
-      'This account has no admin access. Check admin_users.'
-    );
+    const { data, error } = await supabase
+      .from('admin_users')
+      .select('user_id')
+      .eq('user_id', session.user.id)
+      .maybeSingle();
 
-    return;
+    if (error) {
+      showLogin('Could not verify admin access: ' + error.message);
+      return;
+    }
+
+    if (!data) {
+      await supabase.auth.signOut();
+      showLogin('This account is not approved for admin access.');
+      return;
+    }
+
+    showApp(session.user.email);
+  } catch (error) {
+    showLogin(error.message || 'Unable to check admin access.');
   }
-
-  showApp(session.user.email);
 }
 
 $('signIn')?.addEventListener('click', async () => {
   if (!supabase) {
-    $('loginMessage').textContent =
-      'Please complete Supabase config first.';
+    if ($('loginMessage')) {
+      $('loginMessage').textContent =
+        'Check the Supabase URL and key in config.js.';
+    }
     return;
   }
 
-  const email = $('email').value.trim();
-  const password = $('password').value;
+  const email = $('email')?.value.trim();
+  const password = $('password')?.value;
 
   if (!email || !password) {
-    $('loginMessage').textContent =
-      'Enter your email and password.';
+    $('loginMessage').textContent = 'Enter your email and password.';
     return;
   }
 
   $('signIn').disabled = true;
-  $('loginMessage').textContent = 'Signing in…';
+  $('loginMessage').textContent = 'Signing in...';
 
   try {
     const { error } = await supabase.auth.signInWithPassword({
@@ -219,55 +196,51 @@ $('password')?.addEventListener('keydown', event => {
 });
 
 $('signOut')?.addEventListener('click', async () => {
-  await supabase?.auth.signOut();
+  if (supabase) {
+    await supabase.auth.signOut();
+  }
+
   showLogin();
-  toast('Signed out');
 });
 
-/* ---------- DASHBOARD ---------- */
+/* ---------- NAVIGATION ---------- */
 
-async function loadOverview() {
-  if (!supabase) return;
+function showTab(tab) {
+  currentTab = tab;
 
-  const [products, orders] = await Promise.all([
-    supabase
-      .from('products')
-      .select('id', { count: 'exact', head: true }),
+  document.querySelectorAll('.nav').forEach(button => {
+    button.classList.toggle('active', button.dataset.tab === tab);
+  });
 
-    supabase
-      .from('orders')
-      .select(
-        'id,status,order_number,customer_name,total_paise,created_at'
-      )
-      .order('created_at', { ascending: false })
-      .limit(6)
-  ]);
+  ['overview', 'products', 'orders'].forEach(name => {
+    $(name + 'Tab')?.classList.toggle('hidden', name !== tab);
+  });
 
-  if (products.error || orders.error) {
-    toast((products.error || orders.error).message);
-    return;
+  if ($('pageTitle')) {
+    $('pageTitle').textContent =
+      tab.charAt(0).toUpperCase() + tab.slice(1);
   }
 
-  if ($('productCount')) {
-    $('productCount').textContent = products.count ?? 0;
-  }
-
-  if ($('orderCount')) {
-    $('orderCount').textContent = orders.data.length;
-  }
-
-  if ($('pendingCount')) {
-    $('pendingCount').textContent =
-      orders.data.filter(order => order.status === 'pending').length;
-  }
-
-  if ($('recentOrders')) {
-    $('recentOrders').innerHTML =
-      ordersMarkup(orders.data, false);
-  }
+  if (tab === 'overview') loadOverview();
+  if (tab === 'products') loadProducts();
+  if (tab === 'orders') loadOrders();
 }
 
-function ordersMarkup(rows, withActions) {
+document.querySelectorAll('.nav').forEach(button => {
+  button.addEventListener('click', () => {
+    showTab(button.dataset.tab);
+  });
+});
+
+document.querySelectorAll('[data-goto]').forEach(button => {
+  button.addEventListener('click', () => {
+    showTab(button.dataset.goto);
+  });
+});
+
+/* ---------- ORDERS ---------- */
+
+function ordersMarkup(rows, withActions = false) {
   if (!rows?.length) {
     return '<p class="muted">No orders found yet.</p>';
   }
@@ -286,46 +259,28 @@ function ordersMarkup(rows, withActions) {
     <tbody>
       ${rows.map(order => `
         <tr>
-          <td>#${esc(
-            order.order_number ?? String(order.id).slice(0, 8)
-          )}</td>
-
+          <td>#${esc(order.order_number ?? order.id)}</td>
           <td>${esc(order.customer_name || '-')}</td>
-
-          <td>${money(order.total_paise, true)}</td>
-
-          <td>
-            <span class="pill ${
-              order.status === 'delivered' ? 'green' :
-              order.status === 'cancelled' ? 'red' : ''
-            }">${esc(order.status || 'pending')}</span>
-          </td>
-
-          <td>
-            ${order.created_at
-              ? new Date(order.created_at).toLocaleDateString('en-IN')
-              : '-'}
-          </td>
-
+          <td>${money(
+            order.total_paise != null
+              ? Number(order.total_paise) / 100
+              : order.total
+          )}</td>
+          <td>${esc(order.status || 'pending')}</td>
+          <td>${order.created_at
+            ? new Date(order.created_at).toLocaleDateString('en-IN')
+            : '-'}</td>
           ${withActions ? `<td>
-            <select
-              aria-label="Update order status"
-              data-status-id="${esc(order.id)}">
-
+            <select data-status-id="${esc(order.id)}">
               ${statusOptions.map(status => `
-                <option
-                  value="${status}"
+                <option value="${status}"
                   ${status === order.status ? 'selected' : ''}>
                   ${status}
                 </option>
               `).join('')}
             </select>
-
-            <button
-              class="table-action"
-              data-save-status="${esc(order.id)}">
-              Save
-            </button>
+            <button class="table-action"
+              data-save-status="${esc(order.id)}">Save</button>
           </td>` : ''}
         </tr>
       `).join('')}
@@ -333,20 +288,55 @@ function ordersMarkup(rows, withActions) {
   </table>`;
 }
 
-async function loadOrders() {
+async function loadOverview() {
   if (!supabase) return;
+
+  const [productsResult, ordersResult] = await Promise.all([
+    supabase.from('products').select('id', {
+      count: 'exact',
+      head: true
+    }),
+    supabase.from('orders')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(6)
+  ]);
+
+  if (productsResult.error || ordersResult.error) {
+    toast((productsResult.error || ordersResult.error).message);
+    return;
+  }
+
+  if ($('productCount')) {
+    $('productCount').textContent = productsResult.count ?? 0;
+  }
+
+  if ($('orderCount')) {
+    $('orderCount').textContent = ordersResult.data.length;
+  }
+
+  if ($('pendingCount')) {
+    $('pendingCount').textContent =
+      ordersResult.data.filter(order => order.status === 'pending').length;
+  }
+
+  if ($('recentOrders')) {
+    $('recentOrders').innerHTML =
+      ordersMarkup(ordersResult.data, false);
+  }
+}
+
+async function loadOrders() {
+  if (!supabase || !$('ordersTable')) return;
 
   const { data, error } = await supabase
     .from('orders')
-    .select(
-      'id,order_number,customer_name,total_paise,status,created_at'
-    )
+    .select('*')
     .order('created_at', { ascending: false })
     .limit(200);
 
   if (error) {
-    $('ordersTable').innerHTML =
-      `<p class="message">${esc(error.message)}</p>`;
+    $('ordersTable').textContent = error.message;
     return;
   }
 
@@ -355,7 +345,6 @@ async function loadOrders() {
   document.querySelectorAll('[data-save-status]').forEach(button => {
     button.addEventListener('click', async () => {
       const id = button.dataset.saveStatus;
-
       const select = document.querySelector(
         `[data-status-id="${CSS.escape(id)}"]`
       );
@@ -364,52 +353,34 @@ async function loadOrders() {
 
       const { error: updateError } = await supabase
         .from('orders')
-        .update({
-          status: select.value,
-          updated_at: new Date().toISOString()
-        })
+        .update({ status: select.value })
         .eq('id', id);
 
       if (updateError) {
         toast(updateError.message);
       } else {
         toast('Order status updated');
-        await loadOrders();
+        loadOrders();
       }
     });
   });
 }
 
 $('refreshOrders')?.addEventListener('click', loadOrders);
-
 /* ---------- PRODUCT HELPERS ---------- */
 
 function productPrice(product) {
-  if (product.price_paise != null) {
-    return Number(product.price_paise) / 100;
-  }
-
-  return Number(product.price) || 0;
+  return Number(product?.price) || 0;
 }
 
 function productImages(product) {
-  if (Array.isArray(product.image_urls)) {
-    return product.image_urls;
-  }
-
-  if (product.image_url) {
-    return [product.image_url];
-  }
-
-  return [];
+  return product?.image_url ? [product.image_url] : [];
 }
 
 function productSizes(product) {
-  if (Array.isArray(product.sizes)) {
-    return product.sizes;
-  }
+  if (Array.isArray(product?.sizes)) return product.sizes;
 
-  if (typeof product.sizes === 'string') {
+  if (typeof product?.sizes === 'string') {
     return product.sizes
       .split(',')
       .map(size => size.trim())
@@ -420,13 +391,13 @@ function productSizes(product) {
 }
 
 function isProductActive(product) {
-  return product.active ?? product.is_active ?? false;
+  return Boolean(product?.is_active);
 }
 
 /* ---------- LOAD PRODUCTS ---------- */
 
 async function loadProducts() {
-  if (!supabase) return;
+  if (!supabase || !$('productsTable')) return;
 
   const { data, error } = await supabase
     .from('products')
@@ -434,72 +405,61 @@ async function loadProducts() {
     .order('created_at', { ascending: false });
 
   if (error) {
-    $('productsTable').innerHTML =
-      `<p class="message">${esc(error.message)}</p>`;
+    $('productsTable').textContent = error.message;
     return;
   }
 
   if (!data?.length) {
     $('productsTable').innerHTML =
-      '<p class="muted">No products yet. Click “Add product” to create the first one.</p>';
+      '<p class="muted">No products yet. Click Add Product to create one.</p>';
     return;
   }
 
-  $('productsTable').innerHTML = `<table>
-    <thead>
-      <tr>
-        <th>PRODUCT</th>
-        <th>PRICE</th>
-        <th>SIZES / STOCK</th>
-        <th>STATUS</th>
-        <th>ACTIONS</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${data.map(product => `
+  $('productsTable').innerHTML = `
+    <table>
+      <thead>
         <tr>
-          <td>
-            <b>${esc(product.name)}</b><br>
-            <small class="muted">${esc(product.slug || '')}</small>
-          </td>
-
-          <td>${money(productPrice(product))}</td>
-
-          <td>${esc(productSizes(product).join(', ') || '-')}</td>
-
-          <td>
-            <span class="pill ${
-              isProductActive(product) ? 'green' : 'red'
-            }">
-              ${isProductActive(product) ? 'Published' : 'Draft'}
-            </span>
-          </td>
-
-          <td>
-            <button
-              class="table-action"
-              data-edit="${esc(product.id)}">
-              Edit
-            </button>
-
-            <button
-              class="table-action"
-              data-delete="${esc(product.id)}">
-              Delete
-            </button>
-          </td>
+          <th>IMAGE</th>
+          <th>PRODUCT</th>
+          <th>PRICE</th>
+          <th>SIZES</th>
+          <th>STOCK</th>
+          <th>STATUS</th>
+          <th>ACTIONS</th>
         </tr>
-      `).join('')}
-    </tbody>
-  </table>`;
+      </thead>
+      <tbody>
+        ${data.map(product => `
+          <tr>
+            <td>
+              ${product.image_url
+                ? `<img src="${esc(product.image_url)}"
+                    alt="${esc(product.name)}"
+                    style="width:55px;height:65px;object-fit:cover;border-radius:6px">`
+                : '-'}
+            </td>
+            <td><b>${esc(product.name)}</b></td>
+            <td>${money(product.price)}</td>
+            <td>${esc(productSizes(product).join(', ') || '-')}</td>
+            <td>${Number(product.stock) || 0}</td>
+            <td>${product.is_active ? 'Published' : 'Draft'}</td>
+            <td>
+              <button class="table-action"
+                data-edit="${esc(product.id)}">Edit</button>
+              <button class="table-action"
+                data-delete="${esc(product.id)}">Delete</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>`;
 
   document.querySelectorAll('[data-edit]').forEach(button => {
     button.addEventListener('click', () => {
-      openProduct(
-        data.find(
-          product => String(product.id) === button.dataset.edit
-        )
+      const product = data.find(
+        item => String(item.id) === button.dataset.edit
       );
+      if (product) openProduct(product);
     });
   });
 
@@ -509,9 +469,7 @@ async function loadProducts() {
         item => String(item.id) === button.dataset.delete
       );
 
-      if (!product || !confirm(`Delete "${product.name}"?`)) {
-        return;
-      }
+      if (!product || !confirm(`Delete "${product.name}"?`)) return;
 
       const { error: deleteError } = await supabase
         .from('products')
@@ -528,72 +486,64 @@ async function loadProducts() {
   });
 }
 
-/* ---------- IMAGE UPLOADER ---------- */
+/* ---------- IMAGE PICKER ---------- */
 
 function setupImageUploader() {
-  const textarea = $('pImages');
+  const imageField = $('pImages');
 
-  if (!textarea || $('pImageFile')) return;
+  if (!imageField || $('pImageFile')) return;
 
   const wrapper = document.createElement('div');
-  wrapper.style.cssText = 'margin:12px 0;';
+  wrapper.style.margin = '12px 0';
 
   wrapper.innerHTML = `
-    <label
-      for="pImageFile"
+    <label for="pImageFile"
       style="display:block;margin-bottom:8px">
-      Product image — choose a file (maximum 5 MB)
+      Choose product image from your computer
     </label>
+    <input id="pImageFile" type="file"
+      accept="image/jpeg,image/png,image/webp,image/gif">
+    <img id="pImagePreview" alt="Image preview"
+      style="display:none;width:120px;height:140px;
+      object-fit:cover;border-radius:8px;margin-top:10px">
+    <p class="muted">Maximum image size: 5 MB.</p>`;
 
-    <input
-      id="pImageFile"
-      type="file"
-      accept="image/jpeg,image/png,image/webp,image/gif"
-      style="display:block;max-width:100%;margin-bottom:10px">
-
-    <img
-      id="pImagePreview"
-      alt="Product image preview"
-      style="display:none;width:130px;height:150px;object-fit:cover;border-radius:8px;margin-bottom:10px">
-
-    <p class="muted" style="font-size:12px">
-      Select a photo from your computer. It will be uploaded to Supabase Storage when you save the product.
-    </p>`;
-
-  textarea.parentElement.insertBefore(wrapper, textarea);
+  imageField.parentElement.insertBefore(wrapper, imageField);
 
   $('pImageFile').addEventListener('change', event => {
-    selectedImageFile = event.target.files?.[0] || null;
-
+    const file = event.target.files?.[0] || null;
     const preview = $('pImagePreview');
+
+    selectedImageFile = null;
 
     if (previewObjectUrl) {
       URL.revokeObjectURL(previewObjectUrl);
+      previewObjectUrl = null;
     }
 
-    previewObjectUrl = null;
-
-    if (!selectedImageFile) {
+    if (!file) {
       preview.style.display = 'none';
       preview.removeAttribute('src');
       return;
     }
 
-    if (!selectedImageFile.type.startsWith('image/')) {
-      toast('Please choose an image file.');
-      selectedImageFile = null;
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+      .includes(file.type)) {
+      toast('Please choose a JPG, PNG, WEBP or GIF image.');
       event.target.value = '';
+      preview.style.display = 'none';
       return;
     }
 
-    if (selectedImageFile.size > 5 * 1024 * 1024) {
+    if (file.size > 5 * 1024 * 1024) {
       toast('Image must be smaller than 5 MB.');
-      selectedImageFile = null;
       event.target.value = '';
+      preview.style.display = 'none';
       return;
     }
 
-    previewObjectUrl = URL.createObjectURL(selectedImageFile);
+    selectedImageFile = file;
+    previewObjectUrl = URL.createObjectURL(file);
     preview.src = previewObjectUrl;
     preview.style.display = 'block';
   });
@@ -602,9 +552,7 @@ function setupImageUploader() {
 function resetImagePicker() {
   selectedImageFile = null;
 
-  if ($('pImageFile')) {
-    $('pImageFile').value = '';
-  }
+  if ($('pImageFile')) $('pImageFile').value = '';
 
   if ($('pImagePreview')) {
     $('pImagePreview').style.display = 'none';
@@ -613,73 +561,72 @@ function resetImagePicker() {
 
   if (previewObjectUrl) {
     URL.revokeObjectURL(previewObjectUrl);
+    previewObjectUrl = null;
   }
-
-  previewObjectUrl = null;
 }
 
-/* ---------- ADD / EDIT PRODUCT ---------- */
+/* ---------- OPEN ADD / EDIT FORM ---------- */
 
 function openProduct(product = null) {
-  $('productForm').reset();
+  const form = $('productForm');
+  const modal = $('productModal');
+
+  if (!form || !modal) {
+    toast('Product form or modal is missing from index.html.');
+    return;
+  }
+
+  form.reset();
   resetImagePicker();
 
   $('productId').value = product?.id ?? '';
-  $('modalTitle').textContent = product ? 'Edit product' : 'Add product';
+  $('modalTitle').textContent =
+    product ? 'Edit product' : 'Add product';
 
   $('pName').value = product?.name || '';
-  $('pSlug').value = product?.slug || '';
   $('pDescription').value = product?.description || '';
   $('pCategory').value = product?.category || 'Chikankari Suits';
   $('pPrice').value = product ? productPrice(product) : '';
-
-  const comparePrice = product?.compare_at_price_paise != null
-    ? Number(product.compare_at_price_paise) / 100
-    : product?.compare_at_price ?? '';
-
-  $('pCompare').value = comparePrice || '';
-
   $('pSizes').value = product
     ? productSizes(product).join(', ')
     : 'S, M, L, XL';
-
-  $('pImages').value = product
-    ? productImages(product).join('\n')
-    : '';
-
-  const stock = product?.stock_by_size || {};
-
-  $('pStock').value = Object.keys(stock).length
-    ? Object.entries(stock)
-        .map(([size, quantity]) => `${size}:${quantity}`)
-        .join(', ')
-    : `S:${product?.stock ?? 0}, M:0, L:0, XL:0`;
-
+  $('pImages').value = product?.image_url || '';
+  $('pStock').value = product ? (Number(product.stock) || 0) : '0';
   $('pActive').checked = product
     ? isProductActive(product)
     : true;
 
-  $('productMessage').textContent = '';
-  $('productModal').classList.remove('hidden');
+  if ($('productMessage')) {
+    $('productMessage').textContent = '';
+  }
+
+  modal.classList.remove('hidden');
 }
 
-$('newProduct')?.addEventListener('click', () => openProduct());
+/* Add Product button */
+$('newProduct')?.addEventListener('click', event => {
+  event.preventDefault();
+  openProduct();
+});
 
+/* Close and Cancel buttons */
 $('closeModal')?.addEventListener('click', () => {
-  $('productModal').classList.add('hidden');
+  $('productModal')?.classList.add('hidden');
   resetImagePicker();
 });
 
 $('cancelProduct')?.addEventListener('click', () => {
-  $('productModal').classList.add('hidden');
+  $('productModal')?.classList.add('hidden');
   resetImagePicker();
 });
 
+/* Automatically create a URL-friendly product name if slug field exists */
 $('pName')?.addEventListener('input', () => {
-  if (!$('productId').value) {
-if ($('pSlug')) {
-  $('pSlug').value = product?.slug || '';
-}      .toLowerCase()
+  const slugField = $('pSlug');
+
+  if (slugField && !$('productId')?.value) {
+    slugField.value = $('pName').value
+      .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]+/g, '-')
@@ -687,52 +634,38 @@ if ($('pSlug')) {
   }
 });
 
-/* ---------- UPLOAD IMAGE TO SUPABASE STORAGE ---------- */
+/* ---------- UPLOAD IMAGE ---------- */
 
 async function uploadProductImage(file) {
-  const allowedTypes = [
-    'image/jpeg',
-    'image/png',
-    'image/webp',
-    'image/gif'
-  ];
+  if (!file) return null;
 
-  if (!allowedTypes.includes(file.type)) {
-    throw new Error('Use a JPG, PNG, WEBP or GIF image.');
+  const extensionByType = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif'
+  };
+
+  const extension = extensionByType[file.type];
+
+  if (!extension) {
+    throw new Error('Choose a JPG, PNG, WEBP or GIF image.');
   }
 
   if (file.size > 5 * 1024 * 1024) {
     throw new Error('Image must be smaller than 5 MB.');
   }
 
-  const extension = {
-    'image/jpeg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp',
-    'image/gif': 'gif'
-  }[file.type];
-
   const path = `${crypto.randomUUID()}.${extension}`;
 
   const { error } = await supabase.storage
     .from('product-images')
     .upload(path, file, {
-      upsert: false,
-      contentType: file.type
+      contentType: file.type,
+      upsert: false
     });
 
-  if (error) {
-    if (
-      error.message?.toLowerCase().includes('row-level security') ||
-      error.message?.toLowerCase().includes('permission')
-    ) {
-      throw new Error(
-        'Image upload permission denied. Check the product-images Storage policies and admin_users entry.'
-      );
-    }
-
-    throw error;
-  }
+  if (error) throw error;
 
   const { data } = supabase.storage
     .from('product-images')
@@ -741,136 +674,115 @@ async function uploadProductImage(file) {
   return data.publicUrl;
 }
 
-/* ---------- SAVE PRODUCT: SUPPORT BOTH SCHEMAS ---------- */
+/* ---------- SAVE PRODUCT TO EXISTING TABLE ---------- */
 
 async function saveProductRecord(record, id) {
-  const images = Array.isArray(record.image_urls)
-    ? record.image_urls
-    : [];
-
-  const product = {
+  // Only use columns present in your existing products table.
+  const productData = {
     name: record.name,
     description: record.description,
+    price: record.price,
     category: record.category,
-    price: Number(record.price_paise || 0) / 100,
-    image_url: images[0] || null,
-    sizes: Array.isArray(record.sizes)
-      ? record.sizes.join(', ')
-      : String(record.sizes || ''),
-    stock: Object.values(record.stock_by_size || {})
-      .reduce((sum, value) => sum + (Number(value) || 0), 0),
-    is_active: Boolean(record.active)
+    image_url: record.image_url,
+    sizes: record.sizes,
+    stock: record.stock,
+    is_active: record.is_active
   };
 
   if (id) {
     return await supabase
       .from('products')
-      .update(product)
+      .update(productData)
       .eq('id', id);
   }
 
   return await supabase
     .from('products')
-    .insert(product);
+    .insert(productData);
 }
+
 /* ---------- SAVE PRODUCT FORM ---------- */
 
 $('productForm')?.addEventListener('submit', async event => {
   event.preventDefault();
 
-  if (!supabase) return;
+  if (!supabase) {
+    toast('Supabase is not connected.');
+    return;
+  }
 
-  const saveButton = $('productForm')
-    .querySelector('[type="submit"]');
+  const form = $('productForm');
+  const saveButton = form.querySelector('[type="submit"]');
+  const message = $('productMessage');
 
   if (saveButton) saveButton.disabled = true;
-
-  $('productMessage').textContent = 'Saving product…';
+  if (message) message.textContent = 'Saving product...';
 
   try {
+    const name = $('pName').value.trim();
+    const description = $('pDescription').value.trim();
+    const category = $('pCategory').value.trim();
+    const price = Number($('pPrice').value);
+
+    if (!name) throw new Error('Please enter the product name.');
+
+    if ($('pPrice').value === '' || !Number.isFinite(price) || price < 0) {
+      throw new Error('Please enter a valid product price.');
+    }
+
     const sizes = $('pSizes').value
       .split(',')
       .map(size => size.trim())
-      .filter(Boolean);
+      .filter(Boolean)
+      .join(', ');
 
-    const stock = {};
+    const stock = Number.parseInt($('pStock').value, 10);
 
-    $('pStock').value.split(',').forEach(part => {
-      const [key, value] = part
-        .split(':')
-        .map(item => item.trim());
-
-      if (key) {
-        stock[key] = Math.max(
-          0,
-          parseInt(value || '0', 10) || 0
-        );
-      }
-    });
-
-    const price = Math.round(
-      Number($('pPrice').value) * 100
-    );
-
-    const compare = $('pCompare').value === ''
-      ? null
-      : Math.round(Number($('pCompare').value) * 100);
-
-    if (compare !== null && compare < price) {
-      $('productMessage').textContent =
-        'Compare-at price should be equal to or higher than the selling price.';
-      return;
+    if (!Number.isInteger(stock) || stock < 0) {
+      throw new Error('Stock must be zero or a positive whole number.');
     }
 
-    let imageUrls = $('pImages').value
-      .split('\n')
-      .map(value => value.trim())
-      .filter(Boolean);
+    let imageUrl = $('pImages').value.trim();
 
-    // Upload the selected local file first.
+    // Upload the computer image if one has been selected.
     if (selectedImageFile) {
-      $('productMessage').textContent = 'Uploading image…';
-
-      const uploadedUrl = await uploadProductImage(
-        selectedImageFile
-      );
-
-      imageUrls = [uploadedUrl, ...imageUrls];
+      if (message) message.textContent = 'Uploading product image...';
+      imageUrl = await uploadProductImage(selectedImageFile);
     }
 
     const record = {
-      slug: $('pSlug').value.trim(),
-      name: $('pName').value.trim(),
-      description: $('pDescription').value.trim(),
-      category: $('pCategory').value.trim(),
-      price_paise: price,
-      compare_at_price_paise: compare,
-      image_urls: [...new Set(imageUrls)],
+      name,
+      description,
+      category,
+      price,
+      image_url: imageUrl || null,
       sizes,
-      stock_by_size: stock,
-      active: $('pActive').checked,
-      updated_at: new Date().toISOString()
+      stock,
+      is_active: $('pActive').checked
     };
 
-    const id = $('productId').value;
+    if (message) message.textContent = 'Saving product...';
 
-    const result = await saveProductRecord(record, id);
+    const id = $('productId').value.trim();
+    const { error } = await saveProductRecord(record, id);
 
-    if (result.error) {
-      $('productMessage').textContent =
-        result.error.message;
-      return;
-    }
+    if (error) throw error;
 
-    $('productModal').classList.add('hidden');
+    $('productModal')?.classList.add('hidden');
     resetImagePicker();
 
-    toast(id ? 'Product updated' : 'Product added');
+    toast(id ? 'Product updated successfully!' : 'Product added successfully!');
 
     await loadProducts();
+    await loadOverview();
+
   } catch (error) {
-    $('productMessage').textContent =
-      error.message || 'Could not save the product.';
+    console.error('Save product error:', error);
+
+    if (message) {
+      message.textContent =
+        error.message || 'Could not save product. Please try again.';
+    }
   } finally {
     if (saveButton) saveButton.disabled = false;
   }
@@ -882,7 +794,9 @@ setupImageUploader();
 
 if (supabase) {
   supabase.auth.onAuthStateChange(() => {
-    setTimeout(requireAdmin, 0);
+    setTimeout(() => {
+      requireAdmin();
+    }, 0);
   });
 
   requireAdmin();
