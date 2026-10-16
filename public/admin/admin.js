@@ -677,8 +677,9 @@ $('cancelProduct')?.addEventListener('click', () => {
 
 $('pName')?.addEventListener('input', () => {
   if (!$('productId').value) {
-    $('pSlug').value = $('pName').value
-      .toLowerCase()
+if ($('pSlug')) {
+  $('pSlug').value = product?.slug || '';
+}      .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]+/g, '-')
