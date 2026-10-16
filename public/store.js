@@ -1,3 +1,6 @@
+// Label Awadh store.js — updated full code
+// Fixes: safe product-detail rendering, UUID/string ID matching, and stale cart safety.
+
 const BUSINESS_WHATSAPP = "";
 function sendOrderToWhatsApp(order) {
   if (!/^\d{10,15}$/.test(BUSINESS_WHATSAPP)) return;
@@ -48,7 +51,8 @@ function hemWork(T,[y,l,r],big){
   return `<g fill="${T}" opacity=".9">${o}</g><path d="M${l} ${y+7} H${r}" stroke="${T}" stroke-width=".9" stroke-dasharray="2.6 1.8" opacity=".8"/>`;
 }
 function art(p,view="front"){
-  if(p.image_urls && p.image_urls.length){const src=p.image_urls[Math.min(view==="back"?1:view==="detail"?2:view==="fabric"?3:0,p.image_urls.length-1)]||p.image_urls[0];return `<img src="${esc(src)}" alt="${esc(p.name)}${view!=="front"?", "+view+" view":""}" loading="lazy" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`;}
+  if(!p || typeof p!=="object") return `<div class="pimg-placeholder" role="img" aria-label="Product image unavailable">Product image unavailable</div>`;
+  if(Array.isArray(p.image_urls) && p.image_urls.length){const src=p.image_urls[Math.min(view==="back"?1:view==="detail"?2:view==="fabric"?3:0,p.image_urls.length-1)]||p.image_urls[0];return `<img src="${esc(src)}" alt="${esc(p.name)}${view!=="front"?", "+view+" view":""}" loading="lazy" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`;}
   const u="a"+(++AN),T=p.thread||"#FFFFFF",S=SH[p.shape]||SH.kurta;
   const label=p.name+(view!=="front"?", "+view+" view":"");
   const defs=`<defs>${butiPat(u+"b",T,view==="fabric"?2.6:1)}<linearGradient id="${u}g" x1="0" x2="1"><stop offset="0" stop-color="#000" stop-opacity=".07"/><stop offset=".5" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".09"/></linearGradient></defs>`;
@@ -212,7 +216,7 @@ function toAnchor(id){if(S.view!=="home"){S.view="home";render()}const el=docume
 /* ---------- components ---------- */
 const HEART='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>';
 function pcard(p){
-  const w=S.wish.includes(p.id);
+  const w=S.wish.some(id=>String(id)===String(p.id));
   return `<article class="pcard">
     <div class="pw"><a href="#" class="pimg arch" data-act="product" data-id="${p.id}" aria-label="${esc(p.name)}">${art(p)}</a>${p.tag?`<span class="tag">${p.tag}</span>`:""}
     <button class="wishbtn ${w?"on":""}" data-act="wish" data-id="${p.id}" aria-label="${w?"Remove from":"Add to"} wishlist" aria-pressed="${w}">${HEART}</button></div>
@@ -363,7 +367,13 @@ function refresh(){const L=filtered();$("#results").innerHTML=resultsHTML(L);$("
 
 /* ---------- PRODUCT ---------- */
 function vProduct(){
-  const p=byId(S.pid),w=S.wish.includes(p.id),r=p.rating,cl=v=>Math.max(0,Math.round(v));
+  const p=byId(S.pid);
+  // A stale link, a missing catalogue row, or a Supabase load failure should
+  // not crash the whole page. Return the shopper to the collection instead.
+  if(!p){
+    return `<div class="wrap"><div class="empty"><h2>Product unavailable</h2><p>This product could not be loaded. Please return to the collection and try again.</p><button class="btn" data-act="shop">Browse the collection</button></div></div>`;
+  }
+  const w=S.wish.some(id=>String(id)===String(p.id)),r=Number(p.rating)||5,cl=v=>Math.max(0,Math.round(v));
   const d5=cl(40+(r-4)*60),d4=cl(35-(r-4)*30),d3=cl(14-(r-4)*14),d2=cl(4-(r-4)*4),d1=Math.max(0,100-d5-d4-d3-d2);
   const sim=P.filter(x=>x.id!==p.id).sort((a,b)=>(b.cat===p.cat)-(a.cat===p.cat)||b.reviews-a.reviews).slice(0,4);
   if(p.free&&!S.size)S.size="Free size";
@@ -408,8 +418,9 @@ function vProduct(){
 }
 function addToCart(){
   const p=byId(S.pid);
+  if(!p){toast("This product is unavailable. Please open it again from the collection.");return false}
   if(!S.size){$("#sizeErr").textContent="Select a size to continue.";return false}
-  const l=S.cart.find(x=>x.id===p.id&&x.size===S.size);
+  const l=S.cart.find(x=>String(x.id)===String(p.id)&&x.size===S.size);
   l?l.qty=Math.min(5,l.qty+1):S.cart.push({id:p.id,size:S.size,qty:1});
   save();badges();toast(`Added to bag: ${short(p)}, ${S.size}`);return true;
 }
@@ -425,7 +436,7 @@ function vWish(){
 
 /* ---------- CART ---------- */
 function totals(){
-  let mrp=0,price=0;S.cart.forEach(l=>{const p=byId(l.id);mrp+=p.mrp*l.qty;price+=p.price*l.qty});
+  let mrp=0,price=0;S.cart.forEach(l=>{const p=byId(l.id);if(p){mrp+=(Number(p.mrp)||0)*l.qty;price+=(Number(p.price)||0)*l.qty}});
   let c=S.coupon&&COUPONS[S.coupon];if(c&&c.min&&price<c.min)c=null;
   const cdisc=c?c.calc(price):0,ship=price===0||price>=1999||(c&&c.ship)?0:99;
   return {mrp,price,disc:mrp-price,cdisc,ship,total:price-cdisc+ship,validCoupon:c?S.coupon:null,items:S.cart.reduce((s,l)=>s+l.qty,0)};
@@ -582,9 +593,9 @@ document.addEventListener("click",e=>{
     case "story":toAnchor("story");break;
     case "anchor":toAnchor(d.to);break;
     case "shop":{const f=blankF();if(d.cat)f.cat.add(d.cat);if(d.new)f.neu=true;if(d.q)f.q=d.q;S.f=f;$("#q").value=f.q;closeModal();go("shop");break}
-    case "product":closeModal();go("product",{pid:+d.id,img:"front",size:null});break;
-    case "wish":{const id=+d.id,i=S.wish.indexOf(id);i<0?S.wish.push(id):S.wish.splice(i,1);save();toast(i<0?"Saved to wishlist":"Removed from wishlist");
-      if(S.view==="product"&&S.pid===id||S.view==="wishlist")render();
+    case "product":closeModal();go("product",{pid:d.id,img:"front",size:null});break;
+    case "wish":{const id=d.id,i=S.wish.findIndex(savedId=>String(savedId)===String(id));i<0?S.wish.push(id):S.wish.splice(i,1);save();toast(i<0?"Saved to wishlist":"Removed from wishlist");
+      if((S.view==="product"&&String(S.pid)===String(id))||S.view==="wishlist")render();
       else document.querySelectorAll(`.wishbtn[data-id="${id}"]`).forEach(b=>{const on=i<0;b.classList.toggle("on",on);b.setAttribute("aria-pressed",on);b.setAttribute("aria-label",(on?"Remove from":"Add to")+" wishlist")});badges();break}
     case "account":toggleAcct();break;
     case "logout":S.user=null;save();badges();toast("Logged out");if(["orders","checkout"].includes(S.view))go("home");break;
@@ -609,7 +620,7 @@ document.addEventListener("click",e=>{
     case "sampleaddr":[["a-line","B-12, Chandni Residency, Hazratganj"],["a-area","Hazratganj"],["a-pin","226001"],["a-city","Lucknow"],["a-state","Uttar Pradesh"]].forEach(([i,v])=>$("#"+i).value=v);break;
     case "placeorder":placeOrder();break;
     case "cancel":{const o=S.orders.find(x=>x.id===d.id);o.cancelled=true;save();render();toast("Order cancelled");break}
-    case "reorder":{const o=S.orders.find(x=>x.id===d.id);o.items.forEach(l=>{const c=S.cart.find(x=>x.id===l.id&&x.size===l.size);c?c.qty=Math.min(5,c.qty+l.qty):S.cart.push({id:l.id,size:l.size,qty:l.qty})});save();go("cart");break}
+    case "reorder":{const o=S.orders.find(x=>x.id===d.id);o.items.forEach(l=>{const c=S.cart.find(x=>String(x.id)===String(l.id)&&x.size===l.size);c?c.qty=Math.min(5,c.qty+l.qty):S.cart.push({id:l.id,size:l.size,qty:l.qty})});save();go("cart");break}
     case "sendotp":{const v=$("#ph").value.replace(/\D/g,"");if(!/^[6-9]\d{9}$/.test(v)){$("#lerr").textContent="Enter a valid 10-digit mobile number.";break}S.login={step:"otp",phone:v};paintLogin();toast("OTP sent (demo: 1234)");break}
     case "editphone":S.login.step="phone";paintLogin();break;
     case "verifyotp":{const v=[...document.querySelectorAll(".od")].map(i=>i.value).join("");if(v!=="1234"){$("#lerr").textContent="Incorrect OTP. For this demo, use 1234.";break}
