@@ -609,4 +609,44 @@ function suggest(v){
   box.hidden=false;
 }
 
+/* Load products from Supabase into the storefront */
+window.LabelAwadhLoadProducts = function (rows) {
+  if (!Array.isArray(rows) || !rows.length) return;
+
+  const mapped = rows.map((row, index) => {
+    const price = Number(row.price ?? row.price_paise / 100 ?? 0);
+    const image = row.image_url || row.image_urls?.[0] || '';
+
+    return {
+      id: row.id,
+      name: row.name || 'Chikankari Collection',
+      price,
+      mrp: Number(row.compare_at_price_paise
+        ? row.compare_at_price_paise / 100
+        : row.compare_at_price || price),
+      category: row.category || 'Chikankari Suits',
+      cat: row.category || 'Chikankari Suits',
+      description: row.description || '',
+      image_url: image,
+      images: image ? [image] : [],
+      colour: row.colour || 'White',
+      color: row.colour || 'White',
+      stitch: 'Chikankari',
+      fabric: row.fabric || 'Cotton',
+      sizes: typeof row.sizes === 'string'
+        ? row.sizes.split(',').map(s => s.trim()).filter(Boolean)
+        : (row.sizes || ['S', 'M', 'L', 'XL']),
+      stock: Number(row.stock || 0),
+      active: row.is_active === true || row.active === true,
+      reviews: 0,
+      tag: 'New',
+      free: false
+    };
+  });
+
+  // Replace demo catalogue and refresh the visible page.
+  P.splice(0, P.length, ...mapped);
+  render();
+};
+
 render();
