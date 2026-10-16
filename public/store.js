@@ -90,15 +90,50 @@ let P=[
  {id:15,name:"Sukoon Lavender Kurta",cat:"Kurtas",shape:"kurta",colour:"Lavender",hex:"#CCC1DC",fabric:"Mulmul cotton",stitch:"Phanda",days:13,price:2350,mrp:2850,rating:4.5,reviews:121,sold:[],fit:"Straight, calf length",desc:"A calm lavender mulmul kurta with phanda buti. Sukoon means peace, and it feels like it."},
  {id:16,name:"Zeenat Powder Blue Saree",cat:"Sarees",shape:"saree",colour:"Powder blue",hex:"#C7D6E1",fabric:"Mulmul cotton",stitch:"Tepchi & Murri",days:28,price:5850,mrp:6900,rating:4.6,reviews:39,sold:[],free:1,tag:"New",fit:"5.5 m with 0.8 m blouse piece",desc:"A soft mulmul saree in powder blue, with a murri border and tepchi buti across the drape."}
 ];
-window.LabelAwadhLoadProducts = function(rows){
-  if(!Array.isArray(rows)||!rows.length)return;
-  const categoryMap={"Kurtas":"kurta","Short Kurtis":"short","Kurta Sets":"set","Anarkalis":"anarkali","Dupattas":"dupatta","Sarees":"saree"};
-  const palette=["#F2EBDD","#E8C5C1","#C3DACB","#F8F6F1","#BDD1E0","#EAC55C","#C2A1B3","#D9C3A5"];
-  P=rows.map((p,i)=>{
-    const sizes=Array.isArray(p.sizes)?p.sizes:["S","M","L","XL"];
-    const stock=p.stock_by_size||{};
-    return {id:p.id,name:p.name,cat:p.category||"Chikankari Suits",shape:categoryMap[p.category]||"kurta",colour:"Ivory",hex:palette[i%palette.length],thread:"#BFAE90",fabric:"Chikankari fabric",stitch:"Hand embroidery",days:14,price:(Number(p.price_paise)||0)/100,mrp:(Number(p.compare_at_price_paise)||Number(p.price_paise)||0)/100,rating:5,reviews:0,sold:sizes.filter(sz=>(Number(stock[sz])||0)<=0),tag:"",fit:"Handcrafted fit",desc:p.description||"Hand-embroidered chikankari piece.",image_urls:Array.isArray(p.image_urls)?p.image_urls:[],sizes,free:sizes.length===1&&sizes[0].toLowerCase()==="free",stock_by_size:stock,slug:p.slug};
+window.LabelAwadhLoadProducts = function(rows) {
+  if (!Array.isArray(rows) || !rows.length) return;
+
+  const categoryMap = {
+    "Kurtas": "kurta",
+    "Short Kurtis": "short",
+    "Kurta Sets": "set",
+    "Anarkalis": "anarkali",
+    "Dupattas": "dupatta",
+    "Sarees": "saree"
+  };
+
+  const palette = [
+    "#F2EBDD", "#E8C5C1", "#C3DACB", "#F8F6F1",
+    "#BDD1E0", "#EAC55C", "#C2A1B3", "#D9C3A5"
+  ];
+
+  P = rows.map((p, i) => {
+    const sizes = Array.isArray(p.sizes) ? p.sizes : ["S", "M", "L", "XL"];
+    const stock = p.stock_by_size || {};
+
+    return {
+      ...p,
+      id: p.id,
+      name: p.name || "Chikankari Suit",
+      cat: p.category || "Chikankari Suits",
+      shape: categoryMap[p.category] || "kurta",
+      colour: p.colour || "Ivory",
+      hex: palette[i % palette.length],
+      thread: "#BFAE90",
+      fabric: p.fabric || "Cotton",
+      sizes,
+      stock,
+      price: Number(p.price ?? (p.price_paise / 100) ?? 0),
+      image_url: p.image_url || p.image_urls?.[0] || "/images/yellow.jpg",
+      images: p.image_url
+        ? [p.image_url]
+        : Array.isArray(p.image_urls) && p.image_urls.length
+          ? p.image_urls
+          : ["/images/yellow.jpg"],
+      active: p.is_active === true || p.active === true
+    };
   });
+
   render();
 };
 
