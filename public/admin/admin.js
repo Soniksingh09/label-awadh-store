@@ -568,6 +568,9 @@ function resetImagePicker() {
 /* ---------- OPEN ADD / EDIT FORM ---------- */
 
 
+
+/* ---------- OPEN ADD / EDIT FORM ---------- */
+
 function openProduct(product = null) {
   const form = $('productForm');
   const modal = $('productModal');
@@ -577,46 +580,71 @@ function openProduct(product = null) {
     return;
   }
 
-  // Reset form and image picker
   form.reset();
-  resetImagePicker();
 
-  // Set values only when the matching HTML field exists
-  if ($('productId')) $('productId').value = product?.id ?? '';
+  if (typeof resetImagePicker === 'function') {
+    resetImagePicker();
+  }
+
+  if ($('productId')) {
+    $('productId').value = product?.id ?? '';
+  }
 
   if ($('modalTitle')) {
-    $('modalTitle').textContent =
-      product ? 'Edit product' : 'Add product';
+    $('modalTitle').textContent = product ? 'Edit product' : 'Add product';
   }
 
   if ($('pName')) $('pName').value = product?.name || '';
+
+  if ($('pSlug')) {
+    $('pSlug').value = product?.slug || '';
+  }
+
   if ($('pDescription')) {
     $('pDescription').value = product?.description || '';
   }
+
   if ($('pCategory')) {
     $('pCategory').value = product?.category || 'Chikankari Suits';
   }
+
   if ($('pPrice')) {
     $('pPrice').value = product ? productPrice(product) : '';
   }
+
+  if ($('pCompare')) {
+    $('pCompare').value = product?.compare_at_price_paise
+      ? Number(product.compare_at_price_paise) / 100
+      : '';
+  }
+
   if ($('pSizes')) {
-    $('pSizes').value = product
-      ? productSizes(product).join(', ')
-      : 'S, M, L, XL';
+    const sizes = productSizes(product || {});
+    $('pSizes').value = product ? sizes.join(', ') : 'S, M, L, XL';
   }
+
+  // HTML mein pImages nahi, pImageFile hai.
+  // Existing image URL ko hidden/optional field ho tabhi set karein.
   if ($('pImages')) {
-    $('pImages').value = product?.image_url || '';
+    const urls = product?.image_urls;
+    $('pImages').value = Array.isArray(urls)
+      ? (urls[0] || '')
+      : (product?.image_url || '');
   }
+
   if ($('pStock')) {
+    const stock = product?.stock_by_size;
     $('pStock').value = product
-      ? (Number(product.stock) || 0)
+      ? (Number(product.stock) || Number(stock?.total) || 0)
       : '0';
   }
+
   if ($('pActive')) {
     $('pActive').checked = product
       ? isProductActive(product)
       : true;
   }
+
   if ($('productMessage')) {
     $('productMessage').textContent = '';
   }
@@ -624,14 +652,15 @@ function openProduct(product = null) {
   modal.classList.remove('hidden');
 }
 
+/* ---------- ADD PRODUCT BUTTON ---------- */
 
-/* Add Product button */
 $('newProduct')?.addEventListener('click', event => {
   event.preventDefault();
   openProduct();
 });
 
-/* Close and Cancel buttons */
+/* ---------- CLOSE / CANCEL ---------- */
+
 $('closeModal')?.addEventListener('click', () => {
   $('productModal')?.classList.add('hidden');
   resetImagePicker();
@@ -642,7 +671,8 @@ $('cancelProduct')?.addEventListener('click', () => {
   resetImagePicker();
 });
 
-/* Automatically create a URL-friendly product name if slug field exists */
+/* ---------- AUTO-GENERATE SLUG ---------- */
+
 $('pName')?.addEventListener('input', () => {
   const slugField = $('pSlug');
 
@@ -661,14 +691,14 @@ $('pName')?.addEventListener('input', () => {
 async function uploadProductImage(file) {
   if (!file) return null;
 
-  const extensionByType = {
+  const extensions = {
     'image/jpeg': 'jpg',
     'image/png': 'png',
     'image/webp': 'webp',
     'image/gif': 'gif'
   };
 
-  const extension = extensionByType[file.type];
+  const extension = extensions[file.type];
 
   if (!extension) {
     throw new Error('Choose a JPG, PNG, WEBP or GIF image.');
@@ -696,19 +726,19 @@ async function uploadProductImage(file) {
   return data.publicUrl;
 }
 
-/* ---------- SAVE PRODUCT TO EXISTING TABLE ---------- */
+/* ---------- SAVE PRODUCT TO SUPABASE ---------- */
 
 async function saveProductRecord(record, id) {
-  // Only use columns present in your existing products table.
   const productData = {
     name: record.name,
     description: record.description,
-    price: record.price,
     category: record.category,
-    image_url: record.image_url,
+    price: record.price,
+    image_urls: record.image_url ? [record.image_url] : [],
     sizes: record.sizes,
-    stock: record.stock,
-    is_active: record.is_active
+    stock_by_size: { total: record.stock },
+    active: Boolean(record.is_active),
+    updated_at: new Date().toISOString()
   };
 
   if (id) {
@@ -741,35 +771,65 @@ $('productForm')?.addEventListener('submit', async event => {
   if (message) message.textContent = 'Saving product...';
 
   try {
-    const name = $('pName').value.trim();
-    const description = $('pDescription').value.trim();
-    const category = $('pCategory').value.trim();
-    const price = Number($('pPrice').value);
+    const name = $('pName')?.value.trim() || '';
+    const description = $('pDescription')?.value.trim() || '';
+    const category = $('pCategory')?.value.trim() || 'Chikankari Suits';
+    const priceText = $('pPrice')?.value ?? '';
+    const price = Number(priceText);
 
-    if (!name) throw new Error('Please enter the product name.');
+    if (!name) {
+      throw new Error('Please enter the product name.');
+    }
 
-    if ($('pPrice').value === '' || !Number.isFinite(price) || price < 0) {
+    if (
+      priceText === '' ||
+      !Number.isFinite(price) ||
+      price < 0
+    ) {
       throw new Error('Please enter a valid product price.');
     }
 
-    const sizes = $('pSizes').value
+    const sizes = ($('pSizes')?.value || '')
       .split(',')
       .map(size => size.trim())
-      .filter(Boolean)
-      .join(', ');
+      .filter(Boolean);
 
-    const stock = Number.parseInt($('pStock').value, 10);
+    if (!sizes.length) {
+      throw new Error('Please enter at least one size.');
+    }
+
+    const stockText = $('pStock')?.value ?? '0';
+    const stock = Number.parseInt(stockText, 10);
 
     if (!Number.isInteger(stock) || stock < 0) {
       throw new Error('Stock must be zero or a positive whole number.');
     }
 
-  let imageUrl = $('pImages')?.value.trim() || '';
+    let imageUrl = '';
 
-    // Upload the computer image if one has been selected.
-    if (selectedImageFile) {
+    // HTML mein file input ka actual ID pImageFile hai.
+    const imageInput = $('pImageFile');
+    const selectedFile = imageInput?.files?.[0] || null;
+
+    // Edit karte waqt existing image ko preserve karein.
+    const existingProductId = $('productId')?.value.trim() || '';
+
+    if (existingProductId) {
+      const existing = await supabase
+        .from('products')
+        .select('image_urls')
+        .eq('id', existingProductId)
+        .maybeSingle();
+
+      if (existing.error) throw existing.error;
+
+      const oldImages = existing.data?.image_urls;
+      imageUrl = Array.isArray(oldImages) ? (oldImages[0] || '') : '';
+    }
+
+    if (selectedFile) {
       if (message) message.textContent = 'Uploading product image...';
-      imageUrl = await uploadProductImage(selectedImageFile);
+      imageUrl = await uploadProductImage(selectedFile);
     }
 
     const record = {
@@ -780,20 +840,23 @@ $('productForm')?.addEventListener('submit', async event => {
       image_url: imageUrl || null,
       sizes,
       stock,
-      is_active: $('pActive').checked
+      is_active: $('pActive')?.checked ?? true
     };
 
     if (message) message.textContent = 'Saving product...';
 
-    const id = $('productId').value.trim();
-    const { error } = await saveProductRecord(record, id);
+    const { error } = await saveProductRecord(record, existingProductId);
 
     if (error) throw error;
 
     $('productModal')?.classList.add('hidden');
     resetImagePicker();
 
-    toast(id ? 'Product updated successfully!' : 'Product added successfully!');
+    toast(
+      existingProductId
+        ? 'Product updated successfully!'
+        : 'Product added successfully!'
+    );
 
     await loadProducts();
     await loadOverview();
