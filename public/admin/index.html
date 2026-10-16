@@ -1,1 +1,26 @@
-
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Label Awadh | Admin</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar"><div class="brand"><span class="mark">LA</span><div><b>LABEL AWADH</b><small>STORE ADMIN</small></div></div><div class="nav-label">WORKSPACE</div><button class="nav active" data-tab="overview">▦ &nbsp; Overview</button><button class="nav" data-tab="products">◇ &nbsp; Products</button><button class="nav" data-tab="orders">▤ &nbsp; Orders</button><div class="side-note">Private admin area<br><small>Only approved admin accounts</small></div></aside>
+  <main class="main">
+    <header><div><p class="eyebrow">LABEL AWADH / MANAGEMENT</p><h1 id="pageTitle">Overview</h1></div><div class="account"><span id="signedEmail">Not signed in</span><button id="signOut" class="btn light hidden">Sign out</button></div></header>
+    <section id="setupNotice" class="notice hidden"></section>
+    <section id="loginPanel" class="login-card"><div class="login-art"><div class="art-circle">LA</div><p>Thoughtfully crafted<br>traditional elegance.</p></div><div class="login-form"><p class="eyebrow">SECURE ACCESS</p><h2>Welcome back</h2><p class="muted">Sign in using the admin account created in Supabase.</p><label>Email address<input id="email" type="email" autocomplete="username" placeholder="admin@yourbrand.com"></label><label>Password<input id="password" type="password" autocomplete="current-password" placeholder="Your password"></label><button id="signIn" class="btn primary full">Sign in to dashboard</button><p id="loginMessage" class="message"></p><p class="tiny">Admin access must be granted in the database. Public sign-up is disabled.</p></div></section>
+    <section id="appPanel" class="hidden">
+      <div id="overviewTab"><div class="stats"><article class="stat"><span>Products</span><strong id="productCount">—</strong><small>In catalogue</small></article><article class="stat"><span>Orders</span><strong id="orderCount">—</strong><small>All orders</small></article><article class="stat"><span>Pending orders</span><strong id="pendingCount">—</strong><small>Need attention</small></article></div><div class="panel"><div class="panel-head"><div><h2>Recent orders</h2><p class="muted">Latest orders recorded in Supabase</p></div><button class="btn light" data-goto="orders">View all</button></div><div id="recentOrders" class="table-wrap"></div></div></div>
+      <div id="productsTab" class="hidden"><div class="panel"><div class="panel-head"><div><h2>Product catalogue</h2><p class="muted">Add and maintain your chikankari collection.</p></div><button id="newProduct" class="btn primary">+ Add product</button></div><div id="productsTable" class="table-wrap"></div></div></div>
+      <div id="ordersTab" class="hidden"><div class="panel"><div class="panel-head"><div><h2>Customer orders</h2><p class="muted">Review orders and update fulfilment status.</p></div><button id="refreshOrders" class="btn light">Refresh</button></div><div id="ordersTable" class="table-wrap"></div></div></div>
+    </section>
+    <footer>Label Awadh Admin · Secure access · <span id="connectionState">Not connected</span></footer>
+  </main>
+</div>
+<div id="productModal" class="modal hidden"><div class="modal-card"><div class="panel-head"><div><p class="eyebrow">CATALOGUE</p><h2 id="modalTitle">Add product</h2></div><button id="closeModal" class="icon-btn">✕</button></div><form id="productForm"><input id="productId" type="hidden"><label>Product name<input id="pName" required maxlength="120" placeholder="e.g. Ivory Chikankari Suit"></label><label>URL slug<input id="pSlug" required placeholder="ivory-chikankari-suit"></label><label>Description<textarea id="pDescription" rows="3" placeholder="Fabric, embroidery and care details"></textarea></label><div class="form-grid"><label>Category<input id="pCategory" value="Chikankari Suits" required></label><label>Price (₹)<input id="pPrice" type="number" min="0" step="1" required></label><label>Compare-at price (₹)<input id="pCompare" type="number" min="0" step="1"></label><label>Sizes (comma separated)<input id="pSizes" value="S, M, L, XL" required></label></div><label>Image URLs (one per line)<textarea id="pImages" rows="3" placeholder="https://...jpg"></textarea></label><label>Stock by size (example: S:2, M:4, L:3, XL:1)<input id="pStock" value="S:0, M:0, L:0, XL:0"></label><label class="check"><input id="pActive" type="checkbox"> Publish product on the storefront</label><p class="tiny">Prices are saved as rupees converted to paise. Use public image URLs for now.</p><div class="actions"><button type="button" id="cancelProduct" class="btn light">Cancel</button><button type="submit" class="btn primary">Save product</button></div><p id="productMessage" class="message"></p></form></div></div>
+<div id="toast" class="toast"></div>
+<script src="./config.js"></script><script type="module" src="./admin.js"></script>
+</body></html>
