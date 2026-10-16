@@ -59,7 +59,7 @@ export default function App() {
             );
 
             url.searchParams.set('select', '*');
-            url.searchParams.set('is_active', 'eq.true');
+            url.searchParams.set('active', 'eq.true');
             url.searchParams.set('order', 'created_at.desc');
 
             const result = await fetch(url.toString(), {
