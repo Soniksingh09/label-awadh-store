@@ -7,4 +7,3 @@ import './admin.css';
 
 const isAdminPath = /^\/admin(?:\/|$)/i.test(window.location.pathname);
 createRoot(document.getElementById('root')).render(isAdminPath ? <Admin /> : <App />);
-
