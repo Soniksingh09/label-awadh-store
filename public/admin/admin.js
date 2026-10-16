@@ -764,7 +764,7 @@ $('productForm')?.addEventListener('submit', async event => {
       throw new Error('Stock must be zero or a positive whole number.');
     }
 
-    let imageUrl = $('pImages').value.trim();
+  let imageUrl = $('pImages')?.value.trim() || '';
 
     // Upload the computer image if one has been selected.
     if (selectedImageFile) {
