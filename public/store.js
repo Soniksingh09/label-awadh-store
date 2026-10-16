@@ -1,6 +1,5 @@
-// Label Awadh store.js — updated full code
-// Fixes: safe product-detail rendering, UUID/string ID matching, and stale cart safety.
-
+// SET THIS to your WhatsApp Business number in international format, digits only.
+// Example for India: 919876543210 (do not include +, spaces, or dashes).
 const BUSINESS_WHATSAPP = "";
 function sendOrderToWhatsApp(order) {
   if (!/^\d{10,15}$/.test(BUSINESS_WHATSAPP)) return;
@@ -51,7 +50,8 @@ function hemWork(T,[y,l,r],big){
   return `<g fill="${T}" opacity=".9">${o}</g><path d="M${l} ${y+7} H${r}" stroke="${T}" stroke-width=".9" stroke-dasharray="2.6 1.8" opacity=".8"/>`;
 }
 function art(p,view="front"){
-  if(!p || typeof p!=="object") return `<div class="pimg-placeholder" role="img" aria-label="Product image unavailable">Product image unavailable</div>`;
+  if(!p || typeof p!=="object"){return `<div class="pimg-placeholder" role="img" aria-label="Product image unavailable">Product image unavailable</div>`;}
+
   if(Array.isArray(p.image_urls) && p.image_urls.length){const src=p.image_urls[Math.min(view==="back"?1:view==="detail"?2:view==="fabric"?3:0,p.image_urls.length-1)]||p.image_urls[0];return `<img src="${esc(src)}" alt="${esc(p.name)}${view!=="front"?", "+view+" view":""}" loading="lazy" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`;}
   const u="a"+(++AN),T=p.thread||"#FFFFFF",S=SH[p.shape]||SH.kurta;
   const label=p.name+(view!=="front"?", "+view+" view":"");
@@ -93,64 +93,14 @@ let P=[
  {id:16,name:"Zeenat Powder Blue Saree",cat:"Sarees",shape:"saree",colour:"Powder blue",hex:"#C7D6E1",fabric:"Mulmul cotton",stitch:"Tepchi & Murri",days:28,price:5850,mrp:6900,rating:4.6,reviews:39,sold:[],free:1,tag:"New",fit:"5.5 m with 0.8 m blouse piece",desc:"A soft mulmul saree in powder blue, with a murri border and tepchi buti across the drape."}
 ];
 window.LabelAwadhLoadProducts = function(rows){
-  if (!Array.isArray(rows) || !rows.length) return;
-
-  const categoryMap = {
-    "Kurtas": "kurta", "Short Kurtis": "short", "Kurta Sets": "set",
-    "Anarkalis": "anarkali", "Dupattas": "dupatta", "Sarees": "saree",
-    "Chikankari Suits": "set"
-  };
-  const palette = ["#F2EBDD", "#E8C5C1", "#C3DACB", "#F8F6F1", "#BDD1E0", "#EAC55C", "#C2A1B3", "#D9C3A5"];
-
-  const mapped = rows.filter(row => row && row.id != null && row.name).map((row, i) => {
-    // Supports the current Supabase table (price, image_url, sizes text,
-    // stock, is_active) and the newer schema (price_paise, image_urls, etc.).
-    const id = String(row.id);
-    const category = row.category || "Chikankari Suits";
-    const rawPrice = row.price_paise != null ? Number(row.price_paise) / 100 : Number(row.price || 0);
-    const rawMrp = row.compare_at_price_paise != null
-      ? Number(row.compare_at_price_paise) / 100
-      : (row.compare_at_price != null ? Number(row.compare_at_price) : rawPrice);
-    let sizes = Array.isArray(row.sizes)
-      ? row.sizes
-      : (typeof row.sizes === "string" && row.sizes.trim()
-          ? row.sizes.split(/[,|]/).map(x => x.trim()).filter(Boolean)
-          : ["S", "M", "L", "XL"]);
-    sizes = sizes.map(x => String(x).trim()).filter(Boolean);
-    if (!sizes.length) sizes = ["S", "M", "L", "XL"];
-
-    let stock = row.stock_by_size && typeof row.stock_by_size === "object" ? row.stock_by_size : {};
-    if (!Object.keys(stock).length) {
-      const count = Math.max(0, Number(row.stock) || 0);
-      sizes.forEach(size => { stock[size] = count; });
-    }
-    const imageList = Array.isArray(row.image_urls)
-      ? row.image_urls.filter(Boolean)
-      : (row.image_url ? [String(row.image_url).trim()] : []);
-    const active = row.active !== undefined ? row.active === true : row.is_active !== false;
-
-    return {
-      id, name: String(row.name), slug: row.slug || "",
-      cat: category, shape: categoryMap[category] || "kurta",
-      colour: row.colour || row.color || "Ivory", hex: row.hex || palette[i % palette.length],
-      thread: "#BFAE90", fabric: row.fabric || "Chikankari fabric",
-      stitch: row.stitch || "Hand embroidery", days: Number(row.days) || 14,
-      price: Number.isFinite(rawPrice) ? rawPrice : 0,
-      mrp: Number.isFinite(rawMrp) && rawMrp >= rawPrice ? rawMrp : rawPrice,
-      rating: Number(row.rating) || 5, reviews: Number(row.reviews) || 0,
-      sold: sizes.filter(size => (Number(stock[size]) || 0) <= 0),
-      tag: row.tag || "", fit: row.fit || "Handcrafted fit",
-      desc: row.description || "Hand-embroidered chikankari piece.",
-      image_urls: imageList, sizes,
-      free: sizes.length === 1 && sizes[0].toLowerCase() === "free",
-      stock_by_size: stock, stock: Number(row.stock) || 0,
-      active
-    };
-  }).filter(p => p.active);
-
-  // If no active database products are available, keep the original demo catalogue.
-  if (!mapped.length) return;
-  P = mapped;
+  if(!Array.isArray(rows)||!rows.length)return;
+  const categoryMap={"Kurtas":"kurta","Short Kurtis":"short","Kurta Sets":"set","Anarkalis":"anarkali","Dupattas":"dupatta","Sarees":"saree"};
+  const palette=["#F2EBDD","#E8C5C1","#C3DACB","#F8F6F1","#BDD1E0","#EAC55C","#C2A1B3","#D9C3A5"];
+  P=rows.map((p,i)=>{
+    const sizes=Array.isArray(p.sizes)?p.sizes:["S","M","L","XL"];
+    const stock=p.stock_by_size||{};
+    return {id:p.id,name:p.name,cat:p.category||"Chikankari Suits",shape:categoryMap[p.category]||"kurta",colour:"Ivory",hex:palette[i%palette.length],thread:"#BFAE90",fabric:"Chikankari fabric",stitch:"Hand embroidery",days:14,price:(Number(p.price_paise)||0)/100,mrp:(Number(p.compare_at_price_paise)||Number(p.price_paise)||0)/100,rating:5,reviews:0,sold:sizes.filter(sz=>(Number(stock[sz])||0)<=0),tag:"",fit:"Handcrafted fit",desc:p.description||"Hand-embroidered chikankari piece.",image_urls:Array.isArray(p.image_urls)?p.image_urls:[],sizes,free:sizes.length===1&&sizes[0].toLowerCase()==="free",stock_by_size:stock,slug:p.slug};
+  });
   render();
 };
 
@@ -181,7 +131,7 @@ const MARK='<img class="mark" src="'+"data:image/webp;base64,UklGRs5uAQBXRUJQVlA
 const $=s=>document.querySelector(s);
 const inr=n=>"₹"+Math.round(n).toLocaleString("en-IN");
 const off=p=>Math.round((1-p.price/p.mrp)*100);
-const byId=id=>P.find(p=>String(p.id)===String(id));
+const byId=id=>P.find(p=>p && p.id!=null && String(p.id)===String(id));
 const sizesOf=p=>p.free?["Free size"]:(p.sizes?.length?p.sizes:ALL);
 const short=p=>p.name.split(" ")[0];
 const rest=p=>p.name.split(" ").slice(1).join(" ");
@@ -216,6 +166,7 @@ function toAnchor(id){if(S.view!=="home"){S.view="home";render()}const el=docume
 /* ---------- components ---------- */
 const HEART='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>';
 function pcard(p){
+  if(!p || typeof p !== "object") return "";
   const w=S.wish.some(id=>String(id)===String(p.id));
   return `<article class="pcard">
     <div class="pw"><a href="#" class="pimg arch" data-act="product" data-id="${p.id}" aria-label="${esc(p.name)}">${art(p)}</a>${p.tag?`<span class="tag">${p.tag}</span>`:""}
@@ -368,12 +319,11 @@ function refresh(){const L=filtered();$("#results").innerHTML=resultsHTML(L);$("
 /* ---------- PRODUCT ---------- */
 function vProduct(){
   const p=byId(S.pid);
-  // A stale link, a missing catalogue row, or a Supabase load failure should
-  // not crash the whole page. Return the shopper to the collection instead.
+  if(!p) return `<div class="wrap empty"><h2>Product unavailable</h2><p>This item may no longer be in the catalogue.</p><button class="btn" data-act="shop">Browse the collection</button></div>`;
   if(!p){
-    return `<div class="wrap"><div class="empty"><h2>Product unavailable</h2><p>This product could not be loaded. Please return to the collection and try again.</p><button class="btn" data-act="shop">Browse the collection</button></div></div>`;
+    return `<div class="wrap section"><h2>Product not found</h2><p>This product may no longer be available. Please choose a product from the collection.</p><button class="btn" data-act="shop">Back to collection</button></div>`;
   }
-  const w=S.wish.some(id=>String(id)===String(p.id)),r=Number(p.rating)||5,cl=v=>Math.max(0,Math.round(v));
+  const w=S.wish.some(id=>String(id)===String(p.id)),r=Number(p.rating)||0,cl=v=>Math.max(0,Math.round(v));
   const d5=cl(40+(r-4)*60),d4=cl(35-(r-4)*30),d3=cl(14-(r-4)*14),d2=cl(4-(r-4)*4),d1=Math.max(0,100-d5-d4-d3-d2);
   const sim=P.filter(x=>x.id!==p.id).sort((a,b)=>(b.cat===p.cat)-(a.cat===p.cat)||b.reviews-a.reviews).slice(0,4);
   if(p.free&&!S.size)S.size="Free size";
@@ -411,16 +361,15 @@ function vProduct(){
   <section class="reviews" aria-label="Ratings and reviews">
     <div class="avg"><div class="eyebrow">Ratings &amp; reviews</div><div class="big num">${r.toFixed(1)}<span style="font-size:26px"> ★</span></div><div class="muted" style="font-size:13px">${p.reviews.toLocaleString("en-IN")} verified buyers</div>
       <div class="bars">${[[5,d5],[4,d4],[3,d3],[2,d2],[1,d1]].map(([s,v])=>`<div class="bar"><span>${s}★</span><i><b style="width:${v}%"></b></i><span class="num muted">${v}%</span></div>`).join("")}</div></div>
-    <div>${[0,1,2].map(i=>{const v=RV[(p.id+i)%RV.length];return `<div class="rv"><div class="row"><span class="star">${v[2]} ★</span><b>${v[3]}</b></div><p>${v[1]}</p><small>${v[0]} · Verified buyer · ${p.free?"Free size":"Size "+["S","M","L"][i]}</small></div>`}).join("")}</div>
+    <div>${[0,1,2].map(i=>{const reviewIndex=Array.from(String(p.id??"0")).reduce((n,c)=>n+c.charCodeAt(0),0)+i;const v=RV[reviewIndex%RV.length]||RV[i%RV.length];return `<div class="rv"><div class="row"><span class="star">${v[2]} ★</span><b>${v[3]}</b></div><p>${v[1]}</p><small>${v[0]} · Verified buyer · ${p.free?"Free size":"Size "+["S","M","L"][i]}</small></div>`}).join("")}</div>
   </section>
   <section style="border-top:1px solid var(--line);padding-block:40px 64px"><div class="sec-row"><div><div class="eyebrow">You may also like</div><h2>Pieces like this</h2></div></div><div class="pgrid">${sim.map(pcard).join("")}</div></section>
   </div>`;
 }
 function addToCart(){
   const p=byId(S.pid);
-  if(!p){toast("This product is unavailable. Please open it again from the collection.");return false}
   if(!S.size){$("#sizeErr").textContent="Select a size to continue.";return false}
-  const l=S.cart.find(x=>String(x.id)===String(p.id)&&x.size===S.size);
+  const l=S.cart.find(x=>x.id===p.id&&x.size===S.size);
   l?l.qty=Math.min(5,l.qty+1):S.cart.push({id:p.id,size:S.size,qty:1});
   save();badges();toast(`Added to bag: ${short(p)}, ${S.size}`);return true;
 }
@@ -436,7 +385,7 @@ function vWish(){
 
 /* ---------- CART ---------- */
 function totals(){
-  let mrp=0,price=0;S.cart.forEach(l=>{const p=byId(l.id);if(p){mrp+=(Number(p.mrp)||0)*l.qty;price+=(Number(p.price)||0)*l.qty}});
+  let mrp=0,price=0;S.cart.forEach(l=>{const p=byId(l.id);mrp+=p.mrp*l.qty;price+=p.price*l.qty});
   let c=S.coupon&&COUPONS[S.coupon];if(c&&c.min&&price<c.min)c=null;
   const cdisc=c?c.calc(price):0,ship=price===0||price>=1999||(c&&c.ship)?0:99;
   return {mrp,price,disc:mrp-price,cdisc,ship,total:price-cdisc+ship,validCoupon:c?S.coupon:null,items:S.cart.reduce((s,l)=>s+l.qty,0)};
@@ -593,9 +542,9 @@ document.addEventListener("click",e=>{
     case "story":toAnchor("story");break;
     case "anchor":toAnchor(d.to);break;
     case "shop":{const f=blankF();if(d.cat)f.cat.add(d.cat);if(d.new)f.neu=true;if(d.q)f.q=d.q;S.f=f;$("#q").value=f.q;closeModal();go("shop");break}
-    case "product":closeModal();go("product",{pid:d.id,img:"front",size:null});break;
-    case "wish":{const id=d.id,i=S.wish.findIndex(savedId=>String(savedId)===String(id));i<0?S.wish.push(id):S.wish.splice(i,1);save();toast(i<0?"Saved to wishlist":"Removed from wishlist");
-      if((S.view==="product"&&String(S.pid)===String(id))||S.view==="wishlist")render();
+    case "product":closeModal();go("product",{pid:+d.id,img:"front",size:null});break;
+    case "wish":{const id=+d.id,i=S.wish.indexOf(id);i<0?S.wish.push(id):S.wish.splice(i,1);save();toast(i<0?"Saved to wishlist":"Removed from wishlist");
+      if(S.view==="product"&&S.pid===id||S.view==="wishlist")render();
       else document.querySelectorAll(`.wishbtn[data-id="${id}"]`).forEach(b=>{const on=i<0;b.classList.toggle("on",on);b.setAttribute("aria-pressed",on);b.setAttribute("aria-label",(on?"Remove from":"Add to")+" wishlist")});badges();break}
     case "account":toggleAcct();break;
     case "logout":S.user=null;save();badges();toast("Logged out");if(["orders","checkout"].includes(S.view))go("home");break;
@@ -620,7 +569,7 @@ document.addEventListener("click",e=>{
     case "sampleaddr":[["a-line","B-12, Chandni Residency, Hazratganj"],["a-area","Hazratganj"],["a-pin","226001"],["a-city","Lucknow"],["a-state","Uttar Pradesh"]].forEach(([i,v])=>$("#"+i).value=v);break;
     case "placeorder":placeOrder();break;
     case "cancel":{const o=S.orders.find(x=>x.id===d.id);o.cancelled=true;save();render();toast("Order cancelled");break}
-    case "reorder":{const o=S.orders.find(x=>x.id===d.id);o.items.forEach(l=>{const c=S.cart.find(x=>String(x.id)===String(l.id)&&x.size===l.size);c?c.qty=Math.min(5,c.qty+l.qty):S.cart.push({id:l.id,size:l.size,qty:l.qty})});save();go("cart");break}
+    case "reorder":{const o=S.orders.find(x=>x.id===d.id);o.items.forEach(l=>{const c=S.cart.find(x=>x.id===l.id&&x.size===l.size);c?c.qty=Math.min(5,c.qty+l.qty):S.cart.push({id:l.id,size:l.size,qty:l.qty})});save();go("cart");break}
     case "sendotp":{const v=$("#ph").value.replace(/\D/g,"");if(!/^[6-9]\d{9}$/.test(v)){$("#lerr").textContent="Enter a valid 10-digit mobile number.";break}S.login={step:"otp",phone:v};paintLogin();toast("OTP sent (demo: 1234)");break}
     case "editphone":S.login.step="phone";paintLogin();break;
     case "verifyotp":{const v=[...document.querySelectorAll(".od")].map(i=>i.value).join("");if(v!=="1234"){$("#lerr").textContent="Incorrect OTP. For this demo, use 1234.";break}
@@ -667,5 +616,53 @@ function suggest(v){
     cats.map(c=>`<button data-act="shop" data-cat="${esc(c)}"><b>${esc(c)}</b><small>Silhouette</small></button>`).join("")+prods.map(p=>`<button data-act="product" data-id="${p.id}"><span class="s-art">${art(p)}</span>${p.name}<small>${inr(p.price)}</small></button>`).join("")+`<button data-act="shop" data-q="${esc(v)}">See all results for “${esc(v)}”</button>`;
   box.hidden=false;
 }
+
+/* ---------- Supabase catalogue adapter ----------
+   Keep one canonical product mapper: the storefront artwork and cards use
+   image_urls, shape, hex, price/mrp, and the other fields created by the
+   original LabelAwadhLoadProducts function above. */
+const _labelAwadhLoadProducts = window.LabelAwadhLoadProducts;
+window.LabelAwadhLoadProducts = function(rows) {
+  if (!Array.isArray(rows)) {
+    console.warn("Label Awadh: catalogue response is not an array; keeping the demo catalogue.");
+    return;
+  }
+
+  const validRows = rows.filter(row => row && typeof row === "object" && row.id != null && String(row.id).trim() !== "" && row.name);
+  if (!validRows.length) {
+    console.warn("Label Awadh: no valid catalogue products received; keeping the demo catalogue.");
+    return;
+  }
+
+  const mappedRows = validRows.map(row => {
+    const rawPrice = row.price != null ? Number(row.price) : Number(row.price_paise) / 100;
+    const rawMrp = row.compare_at_price != null
+      ? Number(row.compare_at_price)
+      : (row.compare_at_price_paise != null ? Number(row.compare_at_price_paise) / 100 : rawPrice);
+    const images = Array.isArray(row.image_urls)
+      ? row.image_urls.filter(url => typeof url === "string" && url.trim())
+      : (typeof row.image_urls === "string" && row.image_urls.trim()
+          ? [row.image_urls.trim()]
+          : (typeof row.image_url === "string" && row.image_url.trim() ? [row.image_url.trim()] : []));
+    const sizes = Array.isArray(row.sizes)
+      ? row.sizes
+      : (typeof row.sizes === "string" ? row.sizes.split(",").map(size => size.trim()).filter(Boolean) : ["S", "M", "L", "XL"]);
+    const stockBySize = row.stock_by_size && typeof row.stock_by_size === "object" ? row.stock_by_size : {};
+
+    return {
+      ...row,
+      id: row.id,
+      name: String(row.name).trim(),
+      category: row.category || row.cat || "Kurtas",
+      price_paise: Number.isFinite(rawPrice) && rawPrice >= 0 ? Math.round(rawPrice * 100) : 0,
+      compare_at_price_paise: Number.isFinite(rawMrp) && rawMrp >= 0 ? Math.round(rawMrp * 100) : Math.round(Math.max(0, rawPrice || 0) * 100),
+      image_urls: images,
+      sizes,
+      stock_by_size: stockBySize
+    };
+  });
+
+  _labelAwadhLoadProducts(mappedRows);
+};
 
 render();
