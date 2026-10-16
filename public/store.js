@@ -1,5 +1,3 @@
-// SET THIS to your WhatsApp Business number in international format, digits only.
-// Example for India: 919876543210 (do not include +, spaces, or dashes).
 const BUSINESS_WHATSAPP = "";
 function sendOrderToWhatsApp(order) {
   if (!/^\d{10,15}$/.test(BUSINESS_WHATSAPP)) return;
@@ -90,50 +88,65 @@ let P=[
  {id:15,name:"Sukoon Lavender Kurta",cat:"Kurtas",shape:"kurta",colour:"Lavender",hex:"#CCC1DC",fabric:"Mulmul cotton",stitch:"Phanda",days:13,price:2350,mrp:2850,rating:4.5,reviews:121,sold:[],fit:"Straight, calf length",desc:"A calm lavender mulmul kurta with phanda buti. Sukoon means peace, and it feels like it."},
  {id:16,name:"Zeenat Powder Blue Saree",cat:"Sarees",shape:"saree",colour:"Powder blue",hex:"#C7D6E1",fabric:"Mulmul cotton",stitch:"Tepchi & Murri",days:28,price:5850,mrp:6900,rating:4.6,reviews:39,sold:[],free:1,tag:"New",fit:"5.5 m with 0.8 m blouse piece",desc:"A soft mulmul saree in powder blue, with a murri border and tepchi buti across the drape."}
 ];
-window.LabelAwadhLoadProducts = function(rows) {
+window.LabelAwadhLoadProducts = function(rows){
   if (!Array.isArray(rows) || !rows.length) return;
 
   const categoryMap = {
-    "Kurtas": "kurta",
-    "Short Kurtis": "short",
-    "Kurta Sets": "set",
-    "Anarkalis": "anarkali",
-    "Dupattas": "dupatta",
-    "Sarees": "saree"
+    "Kurtas": "kurta", "Short Kurtis": "short", "Kurta Sets": "set",
+    "Anarkalis": "anarkali", "Dupattas": "dupatta", "Sarees": "saree",
+    "Chikankari Suits": "set"
   };
+  const palette = ["#F2EBDD", "#E8C5C1", "#C3DACB", "#F8F6F1", "#BDD1E0", "#EAC55C", "#C2A1B3", "#D9C3A5"];
 
-  const palette = [
-    "#F2EBDD", "#E8C5C1", "#C3DACB", "#F8F6F1",
-    "#BDD1E0", "#EAC55C", "#C2A1B3", "#D9C3A5"
-  ];
+  const mapped = rows.filter(row => row && row.id != null && row.name).map((row, i) => {
+    // Supports the current Supabase table (price, image_url, sizes text,
+    // stock, is_active) and the newer schema (price_paise, image_urls, etc.).
+    const id = String(row.id);
+    const category = row.category || "Chikankari Suits";
+    const rawPrice = row.price_paise != null ? Number(row.price_paise) / 100 : Number(row.price || 0);
+    const rawMrp = row.compare_at_price_paise != null
+      ? Number(row.compare_at_price_paise) / 100
+      : (row.compare_at_price != null ? Number(row.compare_at_price) : rawPrice);
+    let sizes = Array.isArray(row.sizes)
+      ? row.sizes
+      : (typeof row.sizes === "string" && row.sizes.trim()
+          ? row.sizes.split(/[,|]/).map(x => x.trim()).filter(Boolean)
+          : ["S", "M", "L", "XL"]);
+    sizes = sizes.map(x => String(x).trim()).filter(Boolean);
+    if (!sizes.length) sizes = ["S", "M", "L", "XL"];
 
-  P = rows.map((p, i) => {
-    const sizes = Array.isArray(p.sizes) ? p.sizes : ["S", "M", "L", "XL"];
-    const stock = p.stock_by_size || {};
+    let stock = row.stock_by_size && typeof row.stock_by_size === "object" ? row.stock_by_size : {};
+    if (!Object.keys(stock).length) {
+      const count = Math.max(0, Number(row.stock) || 0);
+      sizes.forEach(size => { stock[size] = count; });
+    }
+    const imageList = Array.isArray(row.image_urls)
+      ? row.image_urls.filter(Boolean)
+      : (row.image_url ? [String(row.image_url).trim()] : []);
+    const active = row.active !== undefined ? row.active === true : row.is_active !== false;
 
     return {
-      ...p,
-      id: p.id,
-      name: p.name || "Chikankari Suit",
-      cat: p.category || "Chikankari Suits",
-      shape: categoryMap[p.category] || "kurta",
-      colour: p.colour || "Ivory",
-      hex: palette[i % palette.length],
-      thread: "#BFAE90",
-      fabric: p.fabric || "Cotton",
-      sizes,
-      stock,
-      price: Number(p.price ?? (p.price_paise / 100) ?? 0),
-      image_url: p.image_url || p.image_urls?.[0] || "/images/yellow.jpg",
-      images: p.image_url
-        ? [p.image_url]
-        : Array.isArray(p.image_urls) && p.image_urls.length
-          ? p.image_urls
-          : ["/images/yellow.jpg"],
-      active: p.is_active === true || p.active === true
+      id, name: String(row.name), slug: row.slug || "",
+      cat: category, shape: categoryMap[category] || "kurta",
+      colour: row.colour || row.color || "Ivory", hex: row.hex || palette[i % palette.length],
+      thread: "#BFAE90", fabric: row.fabric || "Chikankari fabric",
+      stitch: row.stitch || "Hand embroidery", days: Number(row.days) || 14,
+      price: Number.isFinite(rawPrice) ? rawPrice : 0,
+      mrp: Number.isFinite(rawMrp) && rawMrp >= rawPrice ? rawMrp : rawPrice,
+      rating: Number(row.rating) || 5, reviews: Number(row.reviews) || 0,
+      sold: sizes.filter(size => (Number(stock[size]) || 0) <= 0),
+      tag: row.tag || "", fit: row.fit || "Handcrafted fit",
+      desc: row.description || "Hand-embroidered chikankari piece.",
+      image_urls: imageList, sizes,
+      free: sizes.length === 1 && sizes[0].toLowerCase() === "free",
+      stock_by_size: stock, stock: Number(row.stock) || 0,
+      active
     };
-  });
+  }).filter(p => p.active);
 
+  // If no active database products are available, keep the original demo catalogue.
+  if (!mapped.length) return;
+  P = mapped;
   render();
 };
 
@@ -164,7 +177,7 @@ const MARK='<img class="mark" src="'+"data:image/webp;base64,UklGRs5uAQBXRUJQVlA
 const $=s=>document.querySelector(s);
 const inr=n=>"₹"+Math.round(n).toLocaleString("en-IN");
 const off=p=>Math.round((1-p.price/p.mrp)*100);
-const byId=id=>P.find(p=>p.id===id);
+const byId=id=>P.find(p=>String(p.id)===String(id));
 const sizesOf=p=>p.free?["Free size"]:(p.sizes?.length?p.sizes:ALL);
 const short=p=>p.name.split(" ")[0];
 const rest=p=>p.name.split(" ").slice(1).join(" ");
