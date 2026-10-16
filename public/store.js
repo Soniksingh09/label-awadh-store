@@ -99,7 +99,7 @@ window.LabelAwadhLoadProducts = function(rows){
   P=rows.map((p,i)=>{
     const sizes=Array.isArray(p.sizes)?p.sizes:["S","M","L","XL"];
     const stock=p.stock_by_size||{};
-    return {id:p.id,name:p.name,cat:p.category||"Chikankari Suits",shape:categoryMap[p.category]||"kurta",colour:"Ivory",hex:palette[i%palette.length],thread:"#BFAE90",fabric:"Chikankari fabric",stitch:"Hand embroidery",days:14,price:(Number(p.price_paise)||0)/100,mrp:(Number(p.compare_at_price_paise)||Number(p.price_paise)||0)/100,rating:5,reviews:0,sold:sizes.filter(sz=>(Number(stock[sz])||0)<=0),tag:"",fit:"Handcrafted fit",desc:p.description||"Hand-embroidered chikankari piece.",image_urls:Array.isArray(p.image_urls)?p.image_urls:[],sizes,free:sizes.length===1&&sizes[0].toLowerCase()==="free",stock_by_size:stock,slug:p.slug};
+    return {id:p.id,name:p.name,cat:p.category||"Chikankari Suits",shape:categoryMap[p.category]||"kurta",colour:"Ivory",hex:palette[i%palette.length],thread:"#BFAE90",fabric:"Chikankari fabric",stitch:"Hand embroidery",days:14,price:(Number(p.price_paise)||0)/100,mrp:(Number(p.compare_at_price_paise)||Number(p.price_paise)||0)/100,rating:5,reviews:0,sold:[],,tag:"",fit:"Handcrafted fit",desc:p.description||"Hand-embroidered chikankari piece.",image_urls:Array.isArray(p.image_urls)?p.image_urls:[],sizes,free:sizes.length===1&&sizes[0].toLowerCase()==="free",stock_by_size:stock,slug:p.slug};
   });
   render();
 };
