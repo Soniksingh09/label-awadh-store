@@ -743,38 +743,11 @@ async function uploadProductImage(file) {
 /* ---------- SAVE PRODUCT: SUPPORT BOTH SCHEMAS ---------- */
 
 async function saveProductRecord(record, id) {
-  let result;
-
-  // First try the original schema.
-  if (id) {
-    result = await supabase
-      .from('products')
-      .update(record)
-      .eq('id', id);
-  } else {
-    result = await supabase
-      .from('products')
-      .insert(record);
-  }
-
-  if (!result.error) return result;
-
-  const missingColumn =
-    result.error.code === '42703' ||
-    /column .* does not exist|schema cache/i.test(
-      result.error.message || ''
-    );
-
-  if (!missingColumn) return result;
-
-  // Fallback for the simpler existing table:
-  // price, image_url, sizes (text), stock, is_active.
   const images = Array.isArray(record.image_urls)
     ? record.image_urls
     : [];
 
-  const fallback = {
-    slug: record.slug,
+  const product = {
     name: record.name,
     description: record.description,
     category: record.category,
@@ -784,27 +757,21 @@ async function saveProductRecord(record, id) {
       ? record.sizes.join(', ')
       : String(record.sizes || ''),
     stock: Object.values(record.stock_by_size || {})
-      .reduce(
-        (sum, value) => sum + (Number(value) || 0),
-        0
-      ),
+      .reduce((sum, value) => sum + (Number(value) || 0), 0),
     is_active: Boolean(record.active)
   };
 
   if (id) {
-    result = await supabase
+    return await supabase
       .from('products')
-      .update(fallback)
+      .update(product)
       .eq('id', id);
-  } else {
-    result = await supabase
-      .from('products')
-      .insert(fallback);
   }
 
-  return result;
+  return await supabase
+    .from('products')
+    .insert(product);
 }
-
 /* ---------- SAVE PRODUCT FORM ---------- */
 
 $('productForm')?.addEventListener('submit', async event => {
