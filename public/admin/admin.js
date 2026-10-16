@@ -567,6 +567,7 @@ function resetImagePicker() {
 
 /* ---------- OPEN ADD / EDIT FORM ---------- */
 
+
 function openProduct(product = null) {
   const form = $('productForm');
   const modal = $('productModal');
@@ -576,32 +577,53 @@ function openProduct(product = null) {
     return;
   }
 
+  // Reset form and image picker
   form.reset();
   resetImagePicker();
 
-  $('productId').value = product?.id ?? '';
-  $('modalTitle').textContent =
-    product ? 'Edit product' : 'Add product';
+  // Set values only when the matching HTML field exists
+  if ($('productId')) $('productId').value = product?.id ?? '';
 
-  $('pName').value = product?.name || '';
-  $('pDescription').value = product?.description || '';
-  $('pCategory').value = product?.category || 'Chikankari Suits';
-  $('pPrice').value = product ? productPrice(product) : '';
-  $('pSizes').value = product
-    ? productSizes(product).join(', ')
-    : 'S, M, L, XL';
-  $('pImages').value = product?.image_url || '';
-  $('pStock').value = product ? (Number(product.stock) || 0) : '0';
-  $('pActive').checked = product
-    ? isProductActive(product)
-    : true;
+  if ($('modalTitle')) {
+    $('modalTitle').textContent =
+      product ? 'Edit product' : 'Add product';
+  }
 
+  if ($('pName')) $('pName').value = product?.name || '';
+  if ($('pDescription')) {
+    $('pDescription').value = product?.description || '';
+  }
+  if ($('pCategory')) {
+    $('pCategory').value = product?.category || 'Chikankari Suits';
+  }
+  if ($('pPrice')) {
+    $('pPrice').value = product ? productPrice(product) : '';
+  }
+  if ($('pSizes')) {
+    $('pSizes').value = product
+      ? productSizes(product).join(', ')
+      : 'S, M, L, XL';
+  }
+  if ($('pImages')) {
+    $('pImages').value = product?.image_url || '';
+  }
+  if ($('pStock')) {
+    $('pStock').value = product
+      ? (Number(product.stock) || 0)
+      : '0';
+  }
+  if ($('pActive')) {
+    $('pActive').checked = product
+      ? isProductActive(product)
+      : true;
+  }
   if ($('productMessage')) {
     $('productMessage').textContent = '';
   }
 
   modal.classList.remove('hidden');
 }
+
 
 /* Add Product button */
 $('newProduct')?.addEventListener('click', event => {
