@@ -544,8 +544,7 @@ document.addEventListener("click",e=>{
     case "anchor":toAnchor(d.to);break;
     case "shop":{const f=blankF();if(d.cat)f.cat.add(d.cat);if(d.new)f.neu=true;if(d.q)f.q=d.q;S.f=f;$("#q").value=f.q;closeModal();go("shop");break}
     case "product":closeModal();go("product",{pid:d.id,img:"front",size:null});break;
-    case "wish":{const id=+d.id,i=S.wish.indexOf(id);i<0?S.wish.push(id):S.wish.splice(i,1);save();toast(i<0?"Saved to wishlist":"Removed from wishlist");
-      if(S.view==="product"&&S.pid===id||S.view==="wishlist")render();
+    case "wish":{const id=d.id,i=S.wish.findIndex(x=>String(x)===String(id));i<0?S.wish.push(id):S.wish.splice(i,1);save();toast(i<0?"Saved to wishlist":"Removed from wishlist");      if(S.view==="product"&&S.pid===id||S.view==="wishlist")render();
       else document.querySelectorAll(`.wishbtn[data-id="${id}"]`).forEach(b=>{const on=i<0;b.classList.toggle("on",on);b.setAttribute("aria-pressed",on);b.setAttribute("aria-label",(on?"Remove from":"Add to")+" wishlist")});badges();break}
     case "account":toggleAcct();break;
     case "logout":S.user=null;save();badges();toast("Logged out");if(["orders","checkout"].includes(S.view))go("home");break;
