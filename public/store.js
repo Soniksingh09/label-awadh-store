@@ -385,7 +385,8 @@ function vWish(){
 
 /* ---------- CART ---------- */
 function totals(){
-  let mrp=0,price=0;S.cart.forEach(l=>{const p=byId(l.id);mrp+=p.mrp*l.qty;price+=p.price*l.qty});
+
+let mrp=0,price=0;S.cart.forEach(l=>{const p=byId(l.id);if(!p)return;mrp+=(Number(p.mrp)||0)*l.qty;price+=(Number(p.price)||0)*l.qty});
   let c=S.coupon&&COUPONS[S.coupon];if(c&&c.min&&price<c.min)c=null;
   const cdisc=c?c.calc(price):0,ship=price===0||price>=1999||(c&&c.ship)?0:99;
   return {mrp,price,disc:mrp-price,cdisc,ship,total:price-cdisc+ship,validCoupon:c?S.coupon:null,items:S.cart.reduce((s,l)=>s+l.qty,0)};
