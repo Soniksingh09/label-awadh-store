@@ -698,7 +698,8 @@ window.LabelAwadhLoadProducts = function (rows) {
     const stock = row.stock_by_size && typeof row.stock_by_size === "object" ? row.stock_by_size : {};
     const sizes = Array.isArray(row.sizes) ? row.sizes.map(s => String(s).trim()).filter(Boolean) : (typeof row.sizes === "string" ? row.sizes.split(",").map(s => s.trim()).filter(Boolean) : ["S","M","L","XL"]);
     const free = sizes.length === 1 && sizes[0].toLowerCase().startsWith("free");
-    const sold = free ? [] : sizes.filter(size => Number(stock[size] ?? 0) <= 0);
+    // Treat a size as sold out only when inventory explicitly reports zero. Missing stock_by_size data must not disable every size.
+    const sold = free ? [] : sizes.filter(size => stock[size] != null && Number(stock[size]) <= 0);
     const cat = row.category || "Chikankari Suits";
     const colour = row.colour || row.color || "Ivory";
     const price = Number.isFinite(rawPrice) ? rawPrice : 0;
