@@ -1,25 +1,18 @@
-// Label Awadh store.js — updated full code
-// Fixes: safe product-detail rendering, UUID/string ID matching, and stale cart safety.
-
+// SET THIS to your WhatsApp Business number in international format, digits only.
+// Example for India: 919876543210 (do not include +, spaces, or dashes).
 const BUSINESS_WHATSAPP = "";
 function sendOrderToWhatsApp(order) {
   if (!/^\d{10,15}$/.test(BUSINESS_WHATSAPP)) return;
-  const items = Array.isArray(order.items) ? order.items : [];
   const lines = [
     `New Label Awadh order #${order.id}`,
-    `Customer: ${order.addr?.name || "Customer"}`,
-    `Phone: ${order.addr?.phone || "Not provided"}`,
-    `Address: ${[order.addr?.line, order.addr?.area, order.addr?.city, order.addr?.state].filter(Boolean).join(", ")} - ${order.addr?.pin || ""}`,
-    ...items.map(item => {
-      const p = byId(item.id);
-      const name = item.productName || p?.name || `Product ${item.id}`;
-      const price = Number(item.price ?? p?.price ?? 0);
-      return `${name} | Size ${item.size} | Qty ${item.qty} | ₹${price * item.qty}`;
-    }),
+    `Customer: ${order.addr.name}`,
+    `Phone: ${order.addr.phone}`,
+    `Address: ${order.addr.line}, ${order.addr.area}, ${order.addr.city}, ${order.addr.state} - ${order.addr.pin}`,
+    ...order.items.map(item => { const p = byId(item.id); return `${p.name} | Size ${item.size} | Qty ${item.qty} | ₹${item.price * item.qty}`; }),
     `Total: ₹${order.total}`,
     `Payment: ${order.pay}`
   ];
-  window.open(`https://wa.me/${BUSINESS_WHATSAPP}?text=${encodeURIComponent(lines.join("\n"))}`, "_blank", "noopener,noreferrer");
+  window.open(`https://wa.me/${BUSINESS_WHATSAPP}?text=${encodeURIComponent(lines.join('\n'))}`, '_blank', 'noopener,noreferrer');
 }
 
 
@@ -57,8 +50,9 @@ function hemWork(T,[y,l,r],big){
   return `<g fill="${T}" opacity=".9">${o}</g><path d="M${l} ${y+7} H${r}" stroke="${T}" stroke-width=".9" stroke-dasharray="2.6 1.8" opacity=".8"/>`;
 }
 function art(p,view="front"){
-  if(!p || typeof p!=="object") return `<div class="pimg-placeholder" role="img" aria-label="Product image unavailable">Product image unavailable</div>`;
-  if(Array.isArray(p.image_urls) && p.image_urls.length){const src=p.image_urls[Math.min(view==="back"?1:view==="detail"?2:view==="fabric"?3:0,p.image_urls.length-1)]||p.image_urls[0];return `<img src="${esc(src)}" alt="${esc(p.name)}${view!=="front"?", "+view+" view":""}" loading="lazy" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`;}
+  if(!p || typeof p!=="object"){return `<div class="pimg-placeholder" role="img" aria-label="Product image unavailable">Product image unavailable</div>`;}
+
+  if(p.image_urls && p.image_urls.length){const src=p.image_urls[Math.min(view==="back"?1:view==="detail"?2:view==="fabric"?3:0,p.image_urls.length-1)]||p.image_urls[0];return `<img src="${esc(src)}" alt="${esc(p.name)}${view!=="front"?", "+view+" view":""}" loading="lazy" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`;}
   const u="a"+(++AN),T=p.thread||"#FFFFFF",S=SH[p.shape]||SH.kurta;
   const label=p.name+(view!=="front"?", "+view+" view":"");
   const defs=`<defs>${butiPat(u+"b",T,view==="fabric"?2.6:1)}<linearGradient id="${u}g" x1="0" x2="1"><stop offset="0" stop-color="#000" stop-opacity=".07"/><stop offset=".5" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".09"/></linearGradient></defs>`;
@@ -99,64 +93,14 @@ let P=[
  {id:16,name:"Zeenat Powder Blue Saree",cat:"Sarees",shape:"saree",colour:"Powder blue",hex:"#C7D6E1",fabric:"Mulmul cotton",stitch:"Tepchi & Murri",days:28,price:5850,mrp:6900,rating:4.6,reviews:39,sold:[],free:1,tag:"New",fit:"5.5 m with 0.8 m blouse piece",desc:"A soft mulmul saree in powder blue, with a murri border and tepchi buti across the drape."}
 ];
 window.LabelAwadhLoadProducts = function(rows){
-  if (!Array.isArray(rows) || !rows.length) return;
-
-  const categoryMap = {
-    "Kurtas": "kurta", "Short Kurtis": "short", "Kurta Sets": "set",
-    "Anarkalis": "anarkali", "Dupattas": "dupatta", "Sarees": "saree",
-    "Chikankari Suits": "set"
-  };
-  const palette = ["#F2EBDD", "#E8C5C1", "#C3DACB", "#F8F6F1", "#BDD1E0", "#EAC55C", "#C2A1B3", "#D9C3A5"];
-
-  const mapped = rows.filter(row => row && row.id != null && row.name).map((row, i) => {
-    // Supports the current Supabase table (price, image_url, sizes text,
-    // stock, is_active) and the newer schema (price_paise, image_urls, etc.).
-    const id = String(row.id);
-    const category = row.category || "Chikankari Suits";
-    const rawPrice = row.price_paise != null ? Number(row.price_paise) / 100 : Number(row.price || 0);
-    const rawMrp = row.compare_at_price_paise != null
-      ? Number(row.compare_at_price_paise) / 100
-      : (row.compare_at_price != null ? Number(row.compare_at_price) : rawPrice);
-    let sizes = Array.isArray(row.sizes)
-      ? row.sizes
-      : (typeof row.sizes === "string" && row.sizes.trim()
-          ? row.sizes.split(/[,|]/).map(x => x.trim()).filter(Boolean)
-          : ["S", "M", "L", "XL"]);
-    sizes = sizes.map(x => String(x).trim()).filter(Boolean);
-    if (!sizes.length) sizes = ["S", "M", "L", "XL"];
-
-    let stock = row.stock_by_size && typeof row.stock_by_size === "object" ? row.stock_by_size : {};
-    if (!Object.keys(stock).length) {
-      const count = Math.max(0, Number(row.stock) || 0);
-      sizes.forEach(size => { stock[size] = count; });
-    }
-    const imageList = Array.isArray(row.image_urls)
-      ? row.image_urls.filter(Boolean)
-      : (row.image_url ? [String(row.image_url).trim()] : []);
-    const active = row.active !== undefined ? row.active === true : row.is_active !== false;
-
-    return {
-      id, name: String(row.name), slug: row.slug || "",
-      cat: category, shape: categoryMap[category] || "kurta",
-      colour: row.colour || row.color || "Ivory", hex: row.hex || palette[i % palette.length],
-      thread: "#BFAE90", fabric: row.fabric || "Chikankari fabric",
-      stitch: row.stitch || "Hand embroidery", days: Number(row.days) || 14,
-      price: Number.isFinite(rawPrice) ? rawPrice : 0,
-      mrp: Number.isFinite(rawMrp) && rawMrp >= rawPrice ? rawMrp : rawPrice,
-      rating: Number(row.rating) || 5, reviews: Number(row.reviews) || 0,
-      sold: sizes.filter(size => (Number(stock[size]) || 0) <= 0),
-      tag: row.tag || "", fit: row.fit || "Handcrafted fit",
-      desc: row.description || "Hand-embroidered chikankari piece.",
-      image_urls: imageList, sizes,
-      free: sizes.length === 1 && sizes[0].toLowerCase() === "free",
-      stock_by_size: stock, stock: Number(row.stock) || 0,
-      active
-    };
-  }).filter(p => p.active);
-
-  // If no active database products are available, keep the original demo catalogue.
-  if (!mapped.length) return;
-  P = mapped;
+  if(!Array.isArray(rows)||!rows.length)return;
+  const categoryMap={"Kurtas":"kurta","Short Kurtis":"short","Kurta Sets":"set","Anarkalis":"anarkali","Dupattas":"dupatta","Sarees":"saree"};
+  const palette=["#F2EBDD","#E8C5C1","#C3DACB","#F8F6F1","#BDD1E0","#EAC55C","#C2A1B3","#D9C3A5"];
+  P=rows.map((p,i)=>{
+    const sizes=Array.isArray(p.sizes)?p.sizes:["S","M","L","XL"];
+    const stock=p.stock_by_size||{};
+    return {id:p.id,name:p.name,cat:p.category||"Chikankari Suits",shape:categoryMap[p.category]||"kurta",colour:"Ivory",hex:palette[i%palette.length],thread:"#BFAE90",fabric:"Chikankari fabric",stitch:"Hand embroidery",days:14,price:(Number(p.price_paise)||0)/100,mrp:(Number(p.compare_at_price_paise)||Number(p.price_paise)||0)/100,rating:5,reviews:0,sold:sizes.filter(sz=>(Number(stock[sz])||0)<=0),tag:"",fit:"Handcrafted fit",desc:p.description||"Hand-embroidered chikankari piece.",image_urls:Array.isArray(p.image_urls)?p.image_urls:[],sizes,free:sizes.length===1&&sizes[0].toLowerCase()==="free",stock_by_size:stock,slug:p.slug};
+  });
   render();
 };
 
@@ -187,7 +131,7 @@ const MARK='<img class="mark" src="'+"data:image/webp;base64,UklGRs5uAQBXRUJQVlA
 const $=s=>document.querySelector(s);
 const inr=n=>"₹"+Math.round(n).toLocaleString("en-IN");
 const off=p=>Math.round((1-p.price/p.mrp)*100);
-const byId=id=>P.find(p=>String(p.id)===String(id));
+const byId=id=>P.find(p=>p && p.id!=null && String(p.id)===String(id));
 const sizesOf=p=>p.free?["Free size"]:(p.sizes?.length?p.sizes:ALL);
 const short=p=>p.name.split(" ")[0];
 const rest=p=>p.name.split(" ").slice(1).join(" ");
@@ -222,7 +166,7 @@ function toAnchor(id){if(S.view!=="home"){S.view="home";render()}const el=docume
 /* ---------- components ---------- */
 const HEART='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>';
 function pcard(p){
-  const w=S.wish.some(id=>String(id)===String(p.id));
+  const w=S.wish.includes(p.id);
   return `<article class="pcard">
     <div class="pw"><a href="#" class="pimg arch" data-act="product" data-id="${p.id}" aria-label="${esc(p.name)}">${art(p)}</a>${p.tag?`<span class="tag">${p.tag}</span>`:""}
     <button class="wishbtn ${w?"on":""}" data-act="wish" data-id="${p.id}" aria-label="${w?"Remove from":"Add to"} wishlist" aria-pressed="${w}">${HEART}</button></div>
@@ -374,12 +318,10 @@ function refresh(){const L=filtered();$("#results").innerHTML=resultsHTML(L);$("
 /* ---------- PRODUCT ---------- */
 function vProduct(){
   const p=byId(S.pid);
-  // A stale link, a missing catalogue row, or a Supabase load failure should
-  // not crash the whole page. Return the shopper to the collection instead.
   if(!p){
-    return `<div class="wrap"><div class="empty"><h2>Product unavailable</h2><p>This product could not be loaded. Please return to the collection and try again.</p><button class="btn" data-act="shop">Browse the collection</button></div></div>`;
+    return `<div class="wrap section"><h2>Product not found</h2><p>This product may no longer be available. Please choose a product from the collection.</p><button class="btn" data-act="shop">Back to collection</button></div>`;
   }
-  const w=S.wish.some(id=>String(id)===String(p.id)),r=Number(p.rating)||5,cl=v=>Math.max(0,Math.round(v));
+  const w=S.wish.some(id=>String(id)===String(p.id)),r=Number(p.rating)||0,cl=v=>Math.max(0,Math.round(v));
   const d5=cl(40+(r-4)*60),d4=cl(35-(r-4)*30),d3=cl(14-(r-4)*14),d2=cl(4-(r-4)*4),d1=Math.max(0,100-d5-d4-d3-d2);
   const sim=P.filter(x=>x.id!==p.id).sort((a,b)=>(b.cat===p.cat)-(a.cat===p.cat)||b.reviews-a.reviews).slice(0,4);
   if(p.free&&!S.size)S.size="Free size";
@@ -417,17 +359,27 @@ function vProduct(){
   <section class="reviews" aria-label="Ratings and reviews">
     <div class="avg"><div class="eyebrow">Ratings &amp; reviews</div><div class="big num">${r.toFixed(1)}<span style="font-size:26px"> ★</span></div><div class="muted" style="font-size:13px">${p.reviews.toLocaleString("en-IN")} verified buyers</div>
       <div class="bars">${[[5,d5],[4,d4],[3,d3],[2,d2],[1,d1]].map(([s,v])=>`<div class="bar"><span>${s}★</span><i><b style="width:${v}%"></b></i><span class="num muted">${v}%</span></div>`).join("")}</div></div>
-    <div>${[0,1,2].map(i=>{const v=RV[(p.id+i)%RV.length];return `<div class="rv"><div class="row"><span class="star">${v[2]} ★</span><b>${v[3]}</b></div><p>${v[1]}</p><small>${v[0]} · Verified buyer · ${p.free?"Free size":"Size "+["S","M","L"][i]}</small></div>`}).join("")}</div>
+    <div>${[0,1,2].map(i=>{const reviewIndex=Array.from(String(p.id??"0")).reduce((n,c)=>n+c.charCodeAt(0),0)+i;const v=RV[reviewIndex%RV.length]||RV[i%RV.length];return `<div class="rv"><div class="row"><span class="star">${v[2]} ★</span><b>${v[3]}</b></div><p>${v[1]}</p><small>${v[0]} · Verified buyer · ${p.free?"Free size":"Size "+["S","M","L"][i]}</small></div>`}).join("")}</div>
   </section>
   <section style="border-top:1px solid var(--line);padding-block:40px 64px"><div class="sec-row"><div><div class="eyebrow">You may also like</div><h2>Pieces like this</h2></div></div><div class="pgrid">${sim.map(pcard).join("")}</div></section>
   </div>`;
 }
 function addToCart(){
   const p=byId(S.pid);
-  if(!p){toast("This product is unavailable. Please open it again from the collection.");return false}
-  if(!S.size){$("#sizeErr").textContent="Select a size to continue.";return false}
-  const l=S.cart.find(x=>String(x.id)===String(p.id)&&x.size===S.size);
-  l?l.qty=Math.min(5,l.qty+1):S.cart.push({id:p.id,size:S.size,qty:1});
+  const sizeError=$("#sizeErr");
+  if(!p){toast("This product is unavailable. Please open it again from the collection.");return false;}
+  if(!S.size){if(sizeError)sizeError.textContent="Select a size to continue.";return false;}
+  if(!sizesOf(p).some(s=>String(s)===String(S.size)) || (Array.isArray(p.sold)&&p.sold.some(s=>String(s)===String(S.size)))){
+    if(sizeError)sizeError.textContent="This size is currently unavailable. Please choose another size.";
+    return false;
+  }
+  const stock=(p.stock_by_size&&p.stock_by_size[S.size]!=null)?Math.max(0,Number(p.stock_by_size[S.size])||0):null;
+  const maxQty=stock===null?5:Math.min(5,stock);
+  if(maxQty<1){if(sizeError)sizeError.textContent="This size is out of stock.";return false;}
+  const l=S.cart.find(x=>String(x.id)===String(p.id)&&String(x.size)===String(S.size));
+  if(l){if((Number(l.qty)||0)>=maxQty){if(sizeError)sizeError.textContent=`Only ${maxQty} available for this size.`;return false;}l.qty=Math.min(maxQty,(Number(l.qty)||0)+1);}
+  else S.cart.push({id:String(p.id),size:String(S.size),qty:1});
+  if(sizeError)sizeError.textContent="";
   save();badges();toast(`Added to bag: ${short(p)}, ${S.size}`);return true;
 }
 
@@ -443,14 +395,15 @@ function vWish(){
 /* ---------- CART ---------- */
 function totals(){
   let mrp=0,price=0,items=0;
-  S.cart.forEach(l=>{
-    const p=byId(l?.id);
-    const qty=Math.max(1,Math.min(5,Number(l?.qty)||1));
-    if(p){mrp+=(Number(p.mrp)||0)*qty;price+=(Number(p.price)||0)*qty;items+=qty;}
+  (Array.isArray(S.cart)?S.cart:[]).forEach(l=>{
+    const p=byId(l&&l.id);if(!p)return;
+    const qty=Math.max(1,Math.min(5,Number(l.qty)||1));
+    mrp+=(Number(p.mrp)||Number(p.price)||0)*qty;
+    price+=(Number(p.price)||0)*qty;items+=qty;
   });
   let c=S.coupon&&COUPONS[S.coupon];if(c&&c.min&&price<c.min)c=null;
   const cdisc=c?c.calc(price):0,ship=price===0||price>=1999||(c&&c.ship)?0:99;
-  return {mrp,price,disc:mrp-price,cdisc,ship,total:price-cdisc+ship,validCoupon:c?S.coupon:null,items};
+  return {mrp,price,disc:Math.max(0,mrp-price),cdisc,ship,total:Math.max(0,price-cdisc+ship),validCoupon:c?S.coupon:null,items};
 }
 function summaryHTML(withCoupon,btn){
   const t=totals();
@@ -468,25 +421,21 @@ function summaryHTML(withCoupon,btn){
     ${btn}</aside>`;
 }
 function vCart(){
+  S.cart=(Array.isArray(S.cart)?S.cart:[]).filter(l=>l&&byId(l.id));
+  S.cart.forEach(l=>{l.id=String(l.id);l.qty=Math.max(1,Math.min(5,Number(l.qty)||1));});
   if(!S.cart.length)return `<div class="wrap">${stepsBar(0)}<div class="empty"><h2>Your bag is empty</h2><p>Add a few pieces you love and they'll show up here.</p><button class="btn" data-act="shop">Browse the collection</button>${S.wish.length?`<button class="link" data-act="go" data-view="wishlist">Add pieces from your wishlist</button>`:""}</div></div>`;
-  const invalid=S.cart.some(l=>!byId(l?.id));
-  const lines=S.cart.map((l,i)=>{
-    const p=byId(l?.id);
-    if(!p)return `<div class="card item"><div><h3>Product no longer available</h3><p class="muted">This item is from an older catalogue and cannot be checked out. Remove it, then add the current product from the collection.</p><div class="acts"><button data-act="rmline" data-i="${i}">Remove item</button></div></div></div>`;
-    const qty=Math.max(1,Math.min(5,Number(l.qty)||1));
-    return `<div class="card item">
-      <a href="#" class="pimg" data-act="product" data-id="${esc(p.id)}">${art(p)}</a>
-      <div><div class="eyebrow">${esc(p.cat)}</div><h3>${esc(p.name)}</h3>
-        <div class="sel"><select data-cs="${i}" aria-label="Size">${sizesOf(p).filter(size=>!p.sold.includes(size)).map(size=>`<option value="${esc(size)}" ${size===l.size?"selected":""}>${esc(size)}</option>`).join("")}</select>
-        <select data-cq="${i}" aria-label="Quantity">${[1,2,3,4,5].map(q=>`<option value="${q}" ${q===qty?"selected":""}>Qty ${q}</option>`).join("")}</select></div>
+  return `<div class="wrap">${stepsBar(0)}<div class="two">
+    <div class="items">${S.cart.map((l,i)=>{const p=byId(l.id);return `<div class="card item">
+      <a href="#" class="pimg" data-act="product" data-id="${p.id}">${art(p)}</a>
+      <div><div class="eyebrow">${esc(p.cat)}</div><h3>${p.name}</h3>
+        <div class="sel"><select data-cs="${i}" aria-label="Size">${sizesOf(p).filter(s=>!p.sold.includes(s)).map(s=>`<option ${s===l.size?"selected":""}>${s}</option>`).join("")}</select>
+        <select data-cq="${i}" aria-label="Quantity">${Array.from({length:Math.max(1,Math.min(5,(p.stock_by_size&&p.stock_by_size[l.size]!=null)?(Number(p.stock_by_size[l.size])||0):5))},(_,n)=>n+1).map(q=>`<option value="${q}" ${q===l.qty?"selected":""}>Qty ${q}</option>`).join("")}</select></div>
         <div class="muted" style="font-size:12.5px;margin-top:6px">Delivery by ${dateIn(Date.now(),5)} · 7-day exchange</div>
         <div class="acts"><button data-act="rmline" data-i="${i}">Remove</button><button data-act="movewish" data-i="${i}">Move to wishlist</button></div></div>
-      <div class="itot" style="text-align:right"><div class="pr"><b>${inr(p.price*qty)}</b></div><div class="pr"><s>${inr(p.mrp*qty)}</s><span class="off">${off(p)}% off</span></div></div>
-    </div>`;
-  }).join("");
-  const notice=invalid?`<div class="note" role="alert" style="margin-bottom:14px">One or more items are from an older catalogue. Remove unavailable items before checkout.</div>`:"";
-  const checkoutBtn=invalid?`<button class="btn block" disabled>Remove unavailable items to continue</button>`:`<button class="btn block" data-act="go" data-view="checkout">Place order</button>`;
-  return `<div class="wrap">${stepsBar(0)}${notice}<div class="two"><div class="items">${lines}</div>${summaryHTML(true,checkoutBtn)}</div></div>`;
+      <div class="itot" style="text-align:right"><div class="pr"><b>${inr(p.price*l.qty)}</b></div><div class="pr"><s>${inr(p.mrp*l.qty)}</s><span class="off">${off(p)}% off</span></div></div>
+    </div>`}).join("")}</div>
+    ${summaryHTML(true,`<button class="btn block" data-act="go" data-view="checkout">Place order</button>`)}
+  </div></div>`;
 }
 
 /* ---------- CHECKOUT ---------- */
@@ -517,25 +466,21 @@ function vCheckout(){
 function readAddr(){const g=id=>$("#"+id).value.trim();return {name:g("a-name"),phone:g("a-phone").replace(/\D/g,""),line:g("a-line"),area:g("a-area"),pin:g("a-pin"),city:g("a-city"),state:g("a-state")}}
 function placeOrder(){
   const a=readAddr(),e=$("#coErr");
-  if(!e)return;
-  e.textContent="";
-  if(!S.cart.length)return e.textContent="Your bag is empty.";
-  if(S.cart.some(l=>!byId(l?.id)))return e.textContent="A product in your bag is no longer available. Go back to your bag, remove that item, and add the current product from the collection.";
   if(Object.values(a).some(v=>!v))return e.textContent="Fill in every address field.";
   if(!/^\d{10}$/.test(a.phone))return e.textContent="Mobile number must be 10 digits.";
   if(!/^\d{6}$/.test(a.pin))return e.textContent="PIN code must be 6 digits.";
-  if(S.pay==="upi"&&!/^[\w.\-]{2,}@[a-z]{2,}$/i.test((($("#upi")||{}).value||"").trim()))return e.textContent="Enter a valid UPI ID, like yourname@okaxis.";
+  if(S.pay==="upi"&&!/^[\w.\-]{2,}@[a-z]{2,}$/i.test(($("#upi").value||"").trim()))return e.textContent="Enter a valid UPI ID, like yourname@okaxis.";
   if(S.pay==="card"){
-    if(!$("#cno")||$("#cno").value.replace(/\s/g,"").length!==16)return e.textContent="Card number must be 16 digits.";
-    if(!$("#cexp")||!/^(0[1-9]|1[0-2])\/\d{2}$/.test($("#cexp").value))return e.textContent="Enter expiry as MM/YY.";
-    if(!$("#ccvv")||!/^\d{3}$/.test($("#ccvv").value))return e.textContent="CVV must be 3 digits.";
+    if($("#cno").value.replace(/\s/g,"").length!==16)return e.textContent="Card number must be 16 digits.";
+    if(!/^(0[1-9]|1[0-2])\/\d{2}$/.test($("#cexp").value))return e.textContent="Enter expiry as MM/YY.";
+    if(!/^\d{3}$/.test($("#ccvv").value))return e.textContent="CVV must be 3 digits.";
   }
-  const items=S.cart.map(l=>{
-    const p=byId(l.id);
-    return {id:l.id,size:l.size,qty:Math.max(1,Math.min(5,Number(l.qty)||1)),price:Number(p.price)||0,productName:p.name,productCategory:p.cat};
-  });
+  S.cart=(Array.isArray(S.cart)?S.cart:[]).filter(l=>l&&byId(l.id));
+  if(!S.cart.length)return e.textContent="Your bag is empty or a product is no longer available. Please return to your bag.";
   const t=totals();
-  const o={id:"LA"+String(Date.now()).slice(-8),date:Date.now(),items,total:t.total,save:t.disc+t.cdisc,coupon:t.validCoupon,pay:{upi:"UPI (demo)",card:"Card (demo)",nb:"Net banking (demo)",cod:"Cash on delivery"}[S.pay],addr:a};
+  const orderItems=S.cart.map(l=>{const p=byId(l.id);return p?{id:String(p.id),size:String(l.size),qty:Math.max(1,Math.min(5,Number(l.qty)||1)),price:Number(p.price)||0,name:p.name}:null;});
+  if(orderItems.some(l=>!l))return e.textContent="A product in your bag is unavailable. Please remove it and try again.";
+  const o={id:"LA"+String(Date.now()).slice(-8),date:Date.now(),items:orderItems,total:t.total,save:t.disc+t.cdisc,coupon:t.validCoupon,pay:{upi:"UPI (demo)",card:"Card (demo)",nb:"Net banking (demo)",cod:"Cash on delivery"}[S.pay],addr:a};
   S.addr=a;S.orders.unshift(o);S.cart=[];S.coupon=null;S.lastOrder=o.id;save();go("success");sendOrderToWhatsApp(o);
 }
 function vSuccess(){
@@ -564,7 +509,7 @@ function vOrders(){
       <div class="obody">
         <div class="status ${st===4?"del":st<0?"can":""}">${st<0?"Cancelled":st===4?"Delivered on "+(o.sample?dateIn(o.date,5):dateIn(Date.now())):STAGES[st]+" · Arriving by "+dateIn(o.date,5)}</div>
         ${st>=0?`<div class="track" aria-label="Tracking: ${STAGES[st]}"><span class="fill" style="width:${pct}%"></span>${STAGES.map((s,i)=>`<div class="tstep ${i<=st?"dn":""}"><i>${i<=st?"✓":""}</i><span>${s}</span></div>`).join("")}</div>`:""}
-        <div class="oitems">${o.items.map(l=>{const p=byId(l.id);const name=l.productName||p?.name||`Unavailable product (${l.id})`;const productLink=p?`<a href="#" class="pimg" data-act="product" data-id="${esc(p.id)}">${art(p)}</a>`:`<span class="pimg">${art(null)}</span>`;return `<div class="oitem">${productLink}<div><b style="font-weight:600">${esc(name)}</b><div class="muted" style="font-size:13px">${esc(l.size)} · Qty ${l.qty}</div></div><b class="num">${inr((Number(l.price)||Number(p?.price)||0)*l.qty)}</b></div>`}).join("")}</div>
+        <div class="oitems">${o.items.map(l=>{const p=byId(l.id);if(!p)return "";return `<div class="oitem"><a href="#" class="pimg" data-act="product" data-id="${p.id}">${art(p)}</a><div><b style="font-weight:600">${esc(p.name)}</b><div class="muted" style="font-size:13px">${l.size} · Qty ${l.qty}</div></div><b class="num">${inr(l.price*l.qty)}</b></div>`}).join("")}</div>
         <div class="row">${st>=0&&st<2?`<button class="btn ghost" data-act="cancel" data-id="${o.id}">Cancel order</button>`:""}${st===4?`<button class="btn ghost" data-act="reorder" data-id="${o.id}">Buy again</button>`:""}<button class="btn ghost" data-act="product" data-id="${o.items[0].id}">View piece</button></div>
       </div></article>`}).join(""):`<div class="empty"><h2>No orders yet</h2><p>When you place an order, you can track it here.</p><button class="btn" data-act="shop">Browse the collection</button></div>`}</div></div>`;
 }
@@ -618,9 +563,9 @@ document.addEventListener("click",e=>{
     case "story":toAnchor("story");break;
     case "anchor":toAnchor(d.to);break;
     case "shop":{const f=blankF();if(d.cat)f.cat.add(d.cat);if(d.new)f.neu=true;if(d.q)f.q=d.q;S.f=f;$("#q").value=f.q;closeModal();go("shop");break}
-    case "product":closeModal();go("product",{pid:d.id,img:"front",size:null});break;
-    case "wish":{const id=d.id,i=S.wish.findIndex(savedId=>String(savedId)===String(id));i<0?S.wish.push(id):S.wish.splice(i,1);save();toast(i<0?"Saved to wishlist":"Removed from wishlist");
-      if((S.view==="product"&&String(S.pid)===String(id))||S.view==="wishlist")render();
+    case "product":closeModal();go("product",{pid:+d.id,img:"front",size:null});break;
+    case "wish":{const id=+d.id,i=S.wish.indexOf(id);i<0?S.wish.push(id):S.wish.splice(i,1);save();toast(i<0?"Saved to wishlist":"Removed from wishlist");
+      if(S.view==="product"&&S.pid===id||S.view==="wishlist")render();
       else document.querySelectorAll(`.wishbtn[data-id="${id}"]`).forEach(b=>{const on=i<0;b.classList.toggle("on",on);b.setAttribute("aria-pressed",on);b.setAttribute("aria-label",(on?"Remove from":"Add to")+" wishlist")});badges();break}
     case "account":toggleAcct();break;
     case "logout":S.user=null;save();badges();toast("Logged out");if(["orders","checkout"].includes(S.view))go("home");break;
@@ -636,7 +581,7 @@ document.addEventListener("click",e=>{
     case "sizechart":sizeChart();break;
     case "checkpin":{const v=$("#pin").value.trim(),o=$("#pinOut");if(!/^\d{6}$/.test(v)){o.className="err";o.textContent="Enter a valid 6-digit PIN code."}else{o.className="ok";o.innerHTML=`Delivery by <b>${dateIn(Date.now(),5)}</b> · Cash on delivery available · Free 7-day exchange`}break}
     case "rmline":S.cart.splice(+d.i,1);save();render();toast("Removed from bag");break;
-    case "movewish":{const l=S.cart[+d.i];if(!l)break;S.cart.splice(+d.i,1);if(!S.wish.some(id=>String(id)===String(l.id)))S.wish.push(l.id);save();render();toast("Moved to wishlist");break}
+    case "movewish":{const l=S.cart.splice(+d.i,1)[0];if(!S.wish.includes(l.id))S.wish.push(l.id);save();render();toast("Moved to wishlist");break}
     case "applycoupon":case "usecoupon":{const k=(d.k||$("#cin").value).trim().toUpperCase(),c=COUPONS[k];
       if(!c){$("#cerr").textContent="That coupon code isn't valid.";break}
       if(c.min&&totals().price<c.min){$("#cerr").textContent=`${k} needs a bag total of ${inr(c.min)} or more.`;break}
@@ -645,7 +590,7 @@ document.addEventListener("click",e=>{
     case "sampleaddr":[["a-line","B-12, Chandni Residency, Hazratganj"],["a-area","Hazratganj"],["a-pin","226001"],["a-city","Lucknow"],["a-state","Uttar Pradesh"]].forEach(([i,v])=>$("#"+i).value=v);break;
     case "placeorder":placeOrder();break;
     case "cancel":{const o=S.orders.find(x=>x.id===d.id);o.cancelled=true;save();render();toast("Order cancelled");break}
-    case "reorder":{const o=S.orders.find(x=>x.id===d.id);o.items.forEach(l=>{const c=S.cart.find(x=>String(x.id)===String(l.id)&&x.size===l.size);c?c.qty=Math.min(5,c.qty+l.qty):S.cart.push({id:l.id,size:l.size,qty:l.qty})});save();go("cart");break}
+    case "reorder":{const o=S.orders.find(x=>x.id===d.id);o.items.forEach(l=>{const c=S.cart.find(x=>x.id===l.id&&x.size===l.size);c?c.qty=Math.min(5,c.qty+l.qty):S.cart.push({id:l.id,size:l.size,qty:l.qty})});save();go("cart");break}
     case "sendotp":{const v=$("#ph").value.replace(/\D/g,"");if(!/^[6-9]\d{9}$/.test(v)){$("#lerr").textContent="Enter a valid 10-digit mobile number.";break}S.login={step:"otp",phone:v};paintLogin();toast("OTP sent (demo: 1234)");break}
     case "editphone":S.login.step="phone";paintLogin();break;
     case "verifyotp":{const v=[...document.querySelectorAll(".od")].map(i=>i.value).join("");if(v!=="1234"){$("#lerr").textContent="Incorrect OTP. For this demo, use 1234.";break}
@@ -658,8 +603,21 @@ document.addEventListener("change",e=>{
   const t=e.target;
   if(t.dataset.f){const k=t.dataset.f;if(k==="cat"||k==="fabric"){t.checked?S.f[k].add(t.value):S.f[k].delete(t.value)}else S.f[k]=t.checked;refresh()}
   else if(t.id==="sort"){S.f.sort=t.value;refresh()}
-  else if(t.dataset.cs!==undefined){const l=S.cart[+t.dataset.cs];if(!l||!byId(l.id))return;const dup=S.cart.find(x=>x!==l&&String(x.id)===String(l.id)&&x.size===t.value);if(dup){dup.qty=Math.min(5,dup.qty+l.qty);S.cart.splice(+t.dataset.cs,1)}else l.size=t.value;save();render()}
-  else if(t.dataset.cq!==undefined){const l=S.cart[+t.dataset.cq];if(!l)return;l.qty=Math.max(1,Math.min(5,Number(t.value)||1));save();render()}
+  else if(t.dataset.cs!==undefined){
+    const index=Number(t.dataset.cs),l=S.cart[index],p=l&&byId(l.id);
+    if(!l||!p)return;
+    const dup=S.cart.find(x=>x!==l&&String(x.id)===String(l.id)&&String(x.size)===String(t.value));
+    if(dup){const stock=(p.stock_by_size&&p.stock_by_size[t.value]!=null)?Math.max(0,Number(p.stock_by_size[t.value])||0):5;dup.qty=Math.min(5,stock||5,(Number(dup.qty)||1)+(Number(l.qty)||1));S.cart.splice(index,1)}
+    else if(Array.isArray(p.sold)&&p.sold.some(sz=>String(sz)===String(t.value))){toast("That size is out of stock.");}
+    else l.size=String(t.value);
+    save();render();
+  }
+  else if(t.dataset.cq!==undefined){
+    const index=Number(t.dataset.cq),l=S.cart[index],p=l&&byId(l.id);if(!l||!p)return;
+    const stock=(p.stock_by_size&&p.stock_by_size[l.size]!=null)?Math.max(0,Number(p.stock_by_size[l.size])||0):5;
+    if(stock<1||(Array.isArray(p.sold)&&p.sold.some(sz=>String(sz)===String(l.size)))){toast("This size is out of stock.");return;}
+    l.qty=Math.max(1,Math.min(5,stock,Number(t.value)||1));save();render();
+  }
   else if(t.name==="pay"){const keep=["a-name","a-phone","a-line","a-area","a-pin","a-city","a-state"].map(i=>[i,$("#"+i).value]);S.pay=t.value;render();keep.forEach(([i,v])=>$("#"+i).value=v)}
 });
 document.addEventListener("input",e=>{
@@ -692,5 +650,45 @@ function suggest(v){
     cats.map(c=>`<button data-act="shop" data-cat="${esc(c)}"><b>${esc(c)}</b><small>Silhouette</small></button>`).join("")+prods.map(p=>`<button data-act="product" data-id="${p.id}"><span class="s-art">${art(p)}</span>${p.name}<small>${inr(p.price)}</small></button>`).join("")+`<button data-act="shop" data-q="${esc(v)}">See all results for “${esc(v)}”</button>`;
   box.hidden=false;
 }
+
+/* Load products from Supabase into the storefront */
+window.LabelAwadhLoadProducts = function (rows) {
+  if (!Array.isArray(rows) || !rows.length) return;
+
+  const mapped = rows.map((row, index) => {
+    const price = Number(row.price ?? row.price_paise / 100 ?? 0);
+    const image = row.image_url || row.image_urls?.[0] || '';
+
+    return {
+      id: row.id,
+      name: row.name || 'Chikankari Collection',
+      price,
+      mrp: Number(row.compare_at_price_paise
+        ? row.compare_at_price_paise / 100
+        : row.compare_at_price || price),
+      category: row.category || 'Chikankari Suits',
+      cat: row.category || 'Chikankari Suits',
+      description: row.description || '',
+      image_url: image,
+      images: image ? [image] : [],
+      colour: row.colour || 'White',
+      color: row.colour || 'White',
+      stitch: 'Chikankari',
+      fabric: row.fabric || 'Cotton',
+      sizes: typeof row.sizes === 'string'
+        ? row.sizes.split(',').map(s => s.trim()).filter(Boolean)
+        : (row.sizes || ['S', 'M', 'L', 'XL']),
+      stock: Number(row.stock || 0),
+      active: row.is_active === true || row.active === true,
+      reviews: 0,
+      tag: 'New',
+      free: false
+    };
+  });
+
+  // Replace demo catalogue and refresh the visible page.
+  P.splice(0, P.length, ...mapped);
+  render();
+};
 
 render();
