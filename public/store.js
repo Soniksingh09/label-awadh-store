@@ -408,7 +408,7 @@ function summaryHTML(withCoupon,btn){
 function vCart(){
   if(!S.cart.length)return `<div class="wrap">${stepsBar(0)}<div class="empty"><h2>Your bag is empty</h2><p>Add a few pieces you love and they'll show up here.</p><button class="btn" data-act="shop">Browse the collection</button>${S.wish.length?`<button class="link" data-act="go" data-view="wishlist">Add pieces from your wishlist</button>`:""}</div></div>`;
   return `<div class="wrap">${stepsBar(0)}<div class="two">
-    <div class="items">${S.cart.map((l,i)=>{const p=byId(l.id);return `<div class="card item">
+   <div class="items">${S.cart.map((l,i)=>{const p=byId(l.id);if(!p)return "";return `<div class="card item">
       <a href="#" class="pimg" data-act="product" data-id="${p.id}">${art(p)}</a>
       <div><div class="eyebrow">${esc(p.cat)}</div><h3>${p.name}</h3>
         <div class="sel"><select data-cs="${i}" aria-label="Size">${sizesOf(p).filter(s=>!p.sold.includes(s)).map(s=>`<option ${s===l.size?"selected":""}>${s}</option>`).join("")}</select>
