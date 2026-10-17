@@ -460,7 +460,28 @@ function placeOrder(){
     if(!/^\d{3}$/.test($("#ccvv").value))return e.textContent="CVV must be 3 digits.";
   }
   const t=totals();
-  const o={id:"LA"+String(Date.now()).slice(-8),date:Date.now(),items:S.cart.map(l=>({...l,price:byId(l.id).price})),total:t.total,save:t.disc+t.cdisc,coupon:t.validCoupon,pay:{upi:"UPI",card:"Card",nb:"Net banking",cod:"Cash on delivery"}[S.pay],addr:a};
+
+const orderItems = S.cart.map(l => {
+  const product = byId(l.id);
+  if (!product) return null;
+  return { ...l, price: product.price };
+});
+
+if (!S.cart.length || orderItems.some(item => !item)) {
+  e.textContent = "A product in your bag is unavailable. Please remove it and add it again.";
+  return;
+}
+
+const o = {
+  id: "LA" + String(Date.now()).slice(-8),
+  date: Date.now(),
+  items: orderItems,
+  total: t.total,
+  save: t.disc + t.cdisc,
+  coupon: t.validCoupon,
+  pay: { upi: "UPI", card: "Card", nb: "Net banking", cod: "Cash on delivery" }[S.pay],
+  addr: a
+};
   S.addr=a;S.orders.unshift(o);S.cart=[];S.coupon=null;S.lastOrder=o.id;save();go("success");sendOrderToWhatsApp(o);
 }
 function vSuccess(){
