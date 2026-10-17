@@ -1,7 +1,7 @@
 # Label Awadh — React + Vite + Supabase
 
-Original Label Awadh storefront retained, with a Supabase-backed admin area at `/admin/`. See `START-HERE-HINGLISH.md` for cloud deployment, initial admin setup, and important checkout limitations.
+Label Awadh storefront and admin UI, with Supabase Edge Function source for order creation, payment setup/verification, webhook handling and notifications. The storefront uses the existing public Supabase URL/publishable key fallback in `public/admin/config.js`; server-only secrets must remain in Supabase Edge Function secrets.
 
-Build: `npm run build` (Node.js is required only in the build environment; use Netlify Git integration so it runs in the cloud).
+Cloud build: `npm run build` (Node/npm are required only on the build host, not on the user's laptop). `netlify.toml` configures Netlify build/publish. GitHub Actions runs a cloud build check.
 
-**Not launch-ready for real checkout yet:** storefront checkout still uses demo/localStorage behavior and Razorpay checkout is not wired to the supplied server functions.
+**Not certified production-ready:** Edge Functions must be deployed and configured in the target Supabase project; end-to-end COD/payment tests are still required. Inventory is checked at checkout but is not atomically reserved/decremented, so concurrent checkouts can oversell. Read `README-REPLACE-ON-GITHUB-HINGLISH.md` before replacing repository files.

@@ -1,6 +1,6 @@
 # Label Awadh — React + Supabase E-commerce Backend (Hinglish)
 
-Ye package tumhare existing `awadh.html` design ko reference rakhta hai. Existing storefront abhi prototype-style HTML/JS ko React wrapper mein render karta hai. Is package mein Supabase database schema, secure Edge Functions, payment/notification backend examples aur setup guide hain. **Live services tab tak configured nahi hain jab tak tum apne accounts ke secrets add karke test nahi karti.** Existing storefront checkout abhi automatically in functions ko call nahi karta; live orders lene se pehle checkout integration aur end-to-end tests karna zaroori hai.
+Ye package tumhare existing `awadh.html` design ko reference rakhta hai. Existing storefront abhi prototype-style HTML/JS ko React wrapper mein render karta hai. Is package mein Supabase database schema, secure Edge Functions, payment/notification backend examples aur setup guide hain. **Live services tab tak configured nahi hain jab tak tum apne accounts ke secrets add karke test nahi karti.** Storefront checkout has been wired to call create-order, create-payment-order and verify-payment. This code still requires a production build, deployed Edge Functions/secrets, and end-to-end testing before live orders.
 
 ## Architecture
 - Frontend: React + Vite (existing Label Awadh storefront design preserved)
