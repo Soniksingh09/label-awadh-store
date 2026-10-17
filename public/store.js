@@ -142,6 +142,7 @@ function store(k,v){try{localStorage.setItem("la-"+k,JSON.stringify(v))}catch(e)
 
 const S={view:"home",pid:null,img:"front",size:null,cart:load("cart",[]),wish:load("wish",[]),user:load("user",null),orders:load("orders",[]),coupon:load("coupon",null),addr:load("addr",null),pay:"upi",f:null,after:null,login:{step:"phone",phone:""}};
 const blankF=()=>({q:"",cat:new Set(),size:new Set(),colour:new Set(),fabric:new Set(),max:7000,sale:false,neu:false,sort:"pop"});
+S.pay = (S.pay === "online" || S.pay === "cod") ? S.pay : "cod";
 S.f=blankF();
 
 function save(){store("cart",S.cart);store("wish",S.wish);store("user",S.user);store("orders",S.orders);store("coupon",S.coupon);store("addr",S.addr)}
@@ -444,49 +445,80 @@ function vCheckout(){
   const f=(id,l,v,extra="")=>`<label class="field ${extra}">${l}<input id="${id}" value="${esc(v||"")}" ${id==="a-pin"?'inputmode="numeric" maxlength="6"':id==="a-phone"?'inputmode="tel" maxlength="10"':""}></label>`;
   return `<div class="wrap">${stepsBar(1)}<div class="two"><div class="items">
     <section class="card box"><div class="row" style="justify-content:space-between"><h2>Delivery address</h2><button class="link" data-act="sampleaddr">Fill sample address</button></div>
-      <div class="grid2">${f("a-name","Full name",a.name||S.user.name)}${f("a-phone","Mobile number",a.phone||S.user.phone)}
+      <div class="grid2">${f("a-name","Full name",a.name||S.user.name)}${f("a-phone","Mobile number",a.phone||S.user.phone)}${f("a-email","Email address",a.email||"", "full")}
       ${f("a-line","House no., building, street",a.line,"full")}${f("a-area","Area / locality",a.area)}${f("a-pin","PIN code",a.pin)}${f("a-city","City",a.city)}${f("a-state","State",a.state)}</div>
     </section>
     <section class="card box"><h2>Payment method</h2>
       <div class="pays">
-        <div class="pay ${S.pay==="upi"?"on":""}"><label class="h"><input type="radio" name="pay" value="upi" ${S.pay==="upi"?"checked":""}>UPI <small>Google Pay, PhonePe, Paytm, BHIM</small></label>
-          ${S.pay==="upi"?`<label class="field">UPI ID<input id="upi" placeholder="yourname@okaxis"></label>`:""}</div>
-        <div class="pay ${S.pay==="card"?"on":""}"><label class="h"><input type="radio" name="pay" value="card" ${S.pay==="card"?"checked":""}>Credit / Debit card <small>Visa, Mastercard, RuPay</small></label>
-          ${S.pay==="card"?`<div class="grid2"><label class="field full">Card number<input id="cno" inputmode="numeric" maxlength="19" placeholder="4111 1111 1111 1111"></label><label class="field">Expiry (MM/YY)<input id="cexp" maxlength="5" placeholder="08/29"></label><label class="field">CVV<input id="ccvv" inputmode="numeric" maxlength="3" placeholder="123"></label></div>`:""}</div>
-        <div class="pay ${S.pay==="nb"?"on":""}"><label class="h"><input type="radio" name="pay" value="nb" ${S.pay==="nb"?"checked":""}>Net banking <small>All major banks</small></label>
-          ${S.pay==="nb"?`<label class="field">Bank<select id="bank"><option>HDFC Bank</option><option>ICICI Bank</option><option>State Bank of India</option><option>Axis Bank</option><option>Kotak Mahindra Bank</option></select></label>`:""}</div>
-        <div class="pay ${S.pay==="cod"?"on":""}"><label class="h"><input type="radio" name="pay" value="cod" ${S.pay==="cod"?"checked":""}>Cash on delivery <small>Pay in cash or UPI at your door</small></label></div>
+        <div class="pay ${S.pay==="online"?"on":""}"><label class="h"><input type="radio" name="pay" value="online" ${S.pay==="online"?"checked":""}>Online payment <small>UPI, cards and net banking via Razorpay secure checkout</small></label></div>
+        <div class="pay ${S.pay==="cod"?"on":""}"><label class="h"><input type="radio" name="pay" value="cod" ${S.pay==="cod"?"checked":""}>Cash on delivery <small>Pay when your order arrives</small></label></div>
       </div>
-      <div class="note">This is a demo checkout. No money is charged, so please don't enter real card details.</div>
+      <div class="note">Online payment is available only when Razorpay Test/Live keys are configured on the server. Never enter card details directly on this page.</div>
       <div class="err" id="coErr"></div>
     </section></div>
     ${summaryHTML(false,`<button class="btn block" data-act="placeorder">Pay ${inr(totals().total)} &amp; place order</button><button class="link" data-act="go" data-view="cart">Back to bag</button>`)}
   </div></div>`;
 }
-function readAddr(){const g=id=>$("#"+id).value.trim();return {name:g("a-name"),phone:g("a-phone").replace(/\D/g,""),line:g("a-line"),area:g("a-area"),pin:g("a-pin"),city:g("a-city"),state:g("a-state")}}
-function placeOrder(){
-  const a=readAddr(),e=$("#coErr");
-  if(Object.values(a).some(v=>!v))return e.textContent="Fill in every address field.";
+function readAddr(){const g=id=>$("#"+id).value.trim();return {name:g("a-name"),phone:g("a-phone").replace(/\D/g,""),email:g("a-email").toLowerCase(),line:g("a-line"),area:g("a-area"),pin:g("a-pin"),city:g("a-city"),state:g("a-state")}}
+async function loadRazorpayCheckout(){
+  if(window.Razorpay)return true;
+  await new Promise((resolve,reject)=>{
+    const script=document.createElement("script");script.src="https://checkout.razorpay.com/v1/checkout.js";
+    script.onload=resolve;script.onerror=()=>reject(new Error("Could not load secure payment checkout."));document.head.appendChild(script);
+  });
+  return Boolean(window.Razorpay);
+}
+async function callCheckoutFunction(name,payload){
+  const base=String(window.LABEL_AWADH_SUPABASE_URL||"").replace(/\/$/,"");
+  const key=String(window.LABEL_AWADH_SUPABASE_KEY||"");
+  if(!base||!key)throw new Error("Store backend is not configured. Please contact the store.");
+  const response=await fetch(`${base}/functions/v1/${name}`,{method:"POST",headers:{"Content-Type":"application/json","apikey":key,"Authorization":`Bearer ${key}`},body:JSON.stringify(payload)});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(data.error||`Checkout request failed (${response.status}).`);
+  return data;
+}
+function buildServerOrderPayload(a){
+  return {customer:{name:a.name,email:a.email,phone:a.phone,address_line1:a.line,address_line2:a.area,city:a.city,state:a.state,postal_code:a.pin,country:"India"},payment_method:S.pay==="cod"?"cod":"online",coupon_code:totals().validCoupon||null,items:S.cart.map(l=>({product_id:String(l.id),size:String(l.size),quantity:Math.max(1,Math.min(5,Number(l.qty)||1))}))};
+}
+function showConfirmedOrder(serverOrder,a){
+  const orderItems=S.cart.map(l=>{const p=byId(l.id);return p?{id:String(p.id),size:String(l.size),qty:Math.max(1,Math.min(5,Number(l.qty)||1)),price:Number(p.price)||0,name:p.name}:null;});
+  const total=Number(serverOrder.total_paise)/100;
+  const o={id:String(serverOrder.order_number||serverOrder.order_id),serverId:serverOrder.order_id,date:Date.now(),items:orderItems.filter(Boolean),total,save:(Number(serverOrder.discount_paise)||0)/100,coupon:S.coupon,pay:S.pay==="cod"?"Cash on delivery":"Online payment",addr:a,status:serverOrder.status||"pending"};
+  S.addr=a;S.orders.unshift(o);S.cart=[];S.coupon=null;S.lastOrder=o.id;save();go("success");sendOrderToWhatsApp(o);
+}
+async function placeOrder(){
+  const a=readAddr(),e=$("#coErr");e.textContent="";
+  if(Object.values(a).some(v=>!v))return e.textContent="Fill in every address field, including email.";
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email))return e.textContent="Enter a valid email address.";
   if(!/^\d{10}$/.test(a.phone))return e.textContent="Mobile number must be 10 digits.";
   if(!/^\d{6}$/.test(a.pin))return e.textContent="PIN code must be 6 digits.";
-  if(S.pay==="upi"&&!/^[\w.\-]{2,}@[a-z]{2,}$/i.test(($("#upi").value||"").trim()))return e.textContent="Enter a valid UPI ID, like yourname@okaxis.";
-  if(S.pay==="card"){
-    if($("#cno").value.replace(/\s/g,"").length!==16)return e.textContent="Card number must be 16 digits.";
-    if(!/^(0[1-9]|1[0-2])\/\d{2}$/.test($("#cexp").value))return e.textContent="Enter expiry as MM/YY.";
-    if(!/^\d{3}$/.test($("#ccvv").value))return e.textContent="CVV must be 3 digits.";
-  }
   S.cart=(Array.isArray(S.cart)?S.cart:[]).filter(l=>l&&byId(l.id));
   if(!S.cart.length)return e.textContent="Your bag is empty or a product is no longer available. Please return to your bag.";
-  const t=totals();
-  const orderItems=S.cart.map(l=>{const p=byId(l.id);return p?{id:String(p.id),size:String(l.size),qty:Math.max(1,Math.min(5,Number(l.qty)||1)),price:Number(p.price)||0,name:p.name}:null;});
-  if(orderItems.some(l=>!l))return e.textContent="A product in your bag is unavailable. Please remove it and try again.";
-  const o={id:"LA"+String(Date.now()).slice(-8),date:Date.now(),items:orderItems,total:t.total,save:t.disc+t.cdisc,coupon:t.validCoupon,pay:{upi:"UPI (demo)",card:"Card (demo)",nb:"Net banking (demo)",cod:"Cash on delivery"}[S.pay],addr:a};
-  S.addr=a;S.orders.unshift(o);S.cart=[];S.coupon=null;S.lastOrder=o.id;save();go("success");sendOrderToWhatsApp(o);
+  if(S.cart.some(l=>!l||!byId(l.id)||!byId(l.id).id))return e.textContent="A product in your bag is unavailable. Please remove it and try again.";
+  const btn=document.querySelector('[data-act="placeorder"]');if(btn){btn.disabled=true;btn.textContent="Processing securely…";}
+  try{
+    // The server validates active product IDs, stock, prices, coupons and totals.
+    const created=await callCheckoutFunction("create-order",buildServerOrderPayload(a));
+    if(S.pay==="cod"){
+      showConfirmedOrder(created,a);
+      return;
+    }
+    const payment=await callCheckoutFunction("create-payment-order",{order_id:created.order_id});
+    await loadRazorpayCheckout();
+    const checkout=new window.Razorpay({key:payment.key_id,amount:payment.amount,currency:payment.currency,name:"Label Awadh",description:`Order #${payment.order_number}`,order_id:payment.razorpay_order_id,prefill:{name:a.name,email:a.email,contact:a.phone},theme:{color:"#C5A253"},modal:{ondismiss:()=>{e.textContent="Payment was not completed. Your order remains pending; please retry or contact the store.";if(btn){btn.disabled=false;btn.textContent=`Pay ${inr(Number(created.total_paise)/100)} & place order`;}}},handler:async function(response){
+      try{
+        await callCheckoutFunction("verify-payment",{order_id:created.order_id,razorpay_order_id:response.razorpay_order_id,razorpay_payment_id:response.razorpay_payment_id,razorpay_signature:response.razorpay_signature});
+        showConfirmedOrder(created,a);
+      }catch(err){e.textContent=err.message||"Payment verification failed. Do not retry payment until order status is checked.";if(btn){btn.disabled=false;btn.textContent=`Pay ${inr(Number(created.total_paise)/100)} & place order`;}}
+    }});
+    checkout.on("payment.failed",function(){e.textContent="Payment failed. Your order is not confirmed. Please retry or choose COD.";if(btn){btn.disabled=false;btn.textContent=`Pay ${inr(Number(created.total_paise)/100)} & place order`;}});
+    checkout.open();
+  }catch(err){e.textContent=err.message||"Could not place order. Please try again.";if(btn){btn.disabled=false;btn.textContent=`Pay ${inr(totals().total)} & place order`;}}
 }
 function vSuccess(){
   const o=S.orders.find(x=>x.id===S.lastOrder);if(!o)return vHome();
   return `<div class="wrap">${stepsBar(2)}<div class="done">${MARK}<h1>Thank you, ${esc(o.addr.name.split(" ")[0])}</h1>
-    <p class="muted" style="max-width:48ch">Order <b>#${o.id}</b> for <b>${inr(o.total)}</b> is confirmed. Your piece will be wrapped with our tag and cotton tote, and should reach you by <b>${dateIn(o.date,5)}</b>.</p>
+    <p class="muted" style="max-width:48ch">Order <b>#${o.id}</b> for <b>${inr(o.total)}</b> has been placed. Your piece will be wrapped with our tag and cotton tote, and should reach you by <b>${dateIn(o.date,5)}</b>.</p>
     <p class="muted" style="font-size:13px">Payment: ${o.pay}${o.save?` · You saved ${inr(o.save)}`:""}</p>
     <div class="row" style="justify-content:center"><button class="btn" data-act="go" data-view="orders">Track order</button><button class="btn ghost" data-act="shop">Continue shopping</button></div></div></div>`;
 }
@@ -618,7 +650,7 @@ document.addEventListener("change",e=>{
     if(stock<1||(Array.isArray(p.sold)&&p.sold.some(sz=>String(sz)===String(l.size)))){toast("This size is out of stock.");return;}
     l.qty=Math.max(1,Math.min(5,stock,Number(t.value)||1));save();render();
   }
-  else if(t.name==="pay"){const keep=["a-name","a-phone","a-line","a-area","a-pin","a-city","a-state"].map(i=>[i,$("#"+i).value]);S.pay=t.value;render();keep.forEach(([i,v])=>$("#"+i).value=v)}
+  else if(t.name==="pay"){const keep=["a-name","a-phone","a-email","a-line","a-area","a-pin","a-city","a-state"].map(i=>[i,$("#"+i).value]);S.pay=t.value;render();keep.forEach(([i,v])=>$("#"+i).value=v)}
 });
 document.addEventListener("input",e=>{
   const t=e.target;
