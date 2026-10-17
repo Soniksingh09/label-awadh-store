@@ -651,43 +651,33 @@ function suggest(v){
   box.hidden=false;
 }
 
-/* Load products from Supabase into the storefront */
+/* Supabase product loader — compatible with the actual Label Awadh products schema */
 window.LabelAwadhLoadProducts = function (rows) {
-  if (!Array.isArray(rows) || !rows.length) return;
-
-  const mapped = rows.map((row, index) => {
-    const price = Number(row.price ?? row.price_paise / 100 ?? 0);
-    const image = row.image_url || row.image_urls?.[0] || '';
-
-    return {
-      id: row.id,
-      name: row.name || 'Chikankari Collection',
-      price,
-      mrp: Number(row.compare_at_price_paise
-        ? row.compare_at_price_paise / 100
-        : row.compare_at_price || price),
-      category: row.category || 'Chikankari Suits',
-      cat: row.category || 'Chikankari Suits',
-      description: row.description || '',
-      image_url: image,
-      images: image ? [image] : [],
-      colour: row.colour || 'White',
-      color: row.colour || 'White',
-      stitch: 'Chikankari',
-      fabric: row.fabric || 'Cotton',
-      sizes: typeof row.sizes === 'string'
-        ? row.sizes.split(',').map(s => s.trim()).filter(Boolean)
-        : (row.sizes || ['S', 'M', 'L', 'XL']),
-      stock: Number(row.stock || 0),
-      active: row.is_active === true || row.active === true,
-      reviews: 0,
-      tag: 'New',
-      free: false
-    };
+  if (!Array.isArray(rows) || rows.length === 0) {
+    console.warn("Label Awadh: no product rows received; keeping current catalogue.");
+    return;
+  }
+  const categoryMap = {"Kurtas":"kurta","Short Kurtis":"short","Kurta Sets":"set","Anarkalis":"anarkali","Dupattas":"dupatta","Sarees":"saree","Chikankari Suits":"kurta"};
+  const palette = ["#F2EBDD","#E8C5C1","#C3DACB","#F8F6F1","#BDD1E0","#EAC55C","#C2A1B3","#D9C3A5"];
+  const mapped = rows.filter(row => row && row.id != null && row.active !== false).map((row, i) => {
+    const rawPrice = row.price_paise != null ? Number(row.price_paise) / 100 : Number(row.price ?? 0);
+    const rawMrp = row.compare_at_price_paise != null ? Number(row.compare_at_price_paise) / 100 : Number(row.compare_at_price ?? rawPrice);
+    const images = Array.isArray(row.image_urls) ? row.image_urls.filter(url => typeof url === "string" && url.trim()) : (row.image_url ? [row.image_url] : (Array.isArray(row.images) ? row.images : []));
+    const stock = row.stock_by_size && typeof row.stock_by_size === "object" ? row.stock_by_size : {};
+    const sizes = Array.isArray(row.sizes) ? row.sizes.map(s => String(s).trim()).filter(Boolean) : (typeof row.sizes === "string" ? row.sizes.split(",").map(s => s.trim()).filter(Boolean) : ["S","M","L","XL"]);
+    const free = sizes.length === 1 && sizes[0].toLowerCase().startsWith("free");
+    const sold = free ? [] : sizes.filter(size => Number(stock[size] ?? 0) <= 0);
+    const cat = row.category || "Chikankari Suits";
+    const colour = row.colour || row.color || "Ivory";
+    const price = Number.isFinite(rawPrice) ? rawPrice : 0;
+    const mrp = Number.isFinite(rawMrp) && rawMrp >= price ? rawMrp : price;
+    return {id:String(row.id),slug:row.slug||"",name:row.name||"Chikankari Collection",cat,category:cat,shape:categoryMap[cat]||"kurta",colour,color:colour,hex:row.hex||palette[i%palette.length],thread:row.thread||"#BFAE90",fabric:row.fabric||"Chikankari fabric",stitch:row.stitch||"Hand embroidery",days:Number(row.days)||14,price,mrp,rating:Number(row.rating)||5,reviews:Number(row.reviews)||0,sold,tag:row.tag||"",fit:row.fit||"Handcrafted fit",desc:row.description||row.desc||"Hand-embroidered chikankari piece.",description:row.description||row.desc||"",image_urls:images,image_url:images[0]||"",images,sizes:free?["Free size"]:(sizes.length?sizes:["S","M","L","XL"]),free,stock_by_size:stock,stock:Object.values(stock).reduce((sum,value)=>sum+Math.max(0,Number(value)||0),0),active:row.active!==false};
   });
-
-  // Replace demo catalogue and refresh the visible page.
+  if (!mapped.length) { console.warn("Label Awadh: no valid active products received; keeping current catalogue."); return; }
   P.splice(0, P.length, ...mapped);
+  S.cart = (Array.isArray(S.cart) ? S.cart : []).map(item => ({...item,id:String(item.id)}));
+  S.wish = (Array.isArray(S.wish) ? S.wish : []).map(id => String(id));
+  save();
   render();
 };
 
