@@ -50,8 +50,6 @@ function hemWork(T,[y,l,r],big){
   return `<g fill="${T}" opacity=".9">${o}</g><path d="M${l} ${y+7} H${r}" stroke="${T}" stroke-width=".9" stroke-dasharray="2.6 1.8" opacity=".8"/>`;
 }
 function art(p,view="front"){
-  if(!p || typeof p!=="object"){return `<div class="pimg-placeholder" role="img" aria-label="Product image unavailable">Product image unavailable</div>`;}
-
   if(p.image_urls && p.image_urls.length){const src=p.image_urls[Math.min(view==="back"?1:view==="detail"?2:view==="fabric"?3:0,p.image_urls.length-1)]||p.image_urls[0];return `<img src="${esc(src)}" alt="${esc(p.name)}${view!=="front"?", "+view+" view":""}" loading="lazy" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`;}
   const u="a"+(++AN),T=p.thread||"#FFFFFF",S=SH[p.shape]||SH.kurta;
   const label=p.name+(view!=="front"?", "+view+" view":"");
@@ -131,7 +129,7 @@ const MARK='<img class="mark" src="'+"data:image/webp;base64,UklGRs5uAQBXRUJQVlA
 const $=s=>document.querySelector(s);
 const inr=n=>"₹"+Math.round(n).toLocaleString("en-IN");
 const off=p=>Math.round((1-p.price/p.mrp)*100);
-const byId=id=>P.find(p=>p && p.id!=null && String(p.id)===String(id));
+const byId=id=>P.find(p=>p.id===id);
 const sizesOf=p=>p.free?["Free size"]:(p.sizes?.length?p.sizes:ALL);
 const short=p=>p.name.split(" ")[0];
 const rest=p=>p.name.split(" ").slice(1).join(" ");
@@ -142,16 +140,33 @@ function store(k,v){try{localStorage.setItem("la-"+k,JSON.stringify(v))}catch(e)
 
 const S={view:"home",pid:null,img:"front",size:null,cart:load("cart",[]),wish:load("wish",[]),user:load("user",null),orders:load("orders",[]),coupon:load("coupon",null),addr:load("addr",null),pay:"upi",f:null,after:null,login:{step:"phone",phone:""}};
 const blankF=()=>({q:"",cat:new Set(),size:new Set(),colour:new Set(),fabric:new Set(),max:7000,sale:false,neu:false,sort:"pop"});
-S.pay = (S.pay === "online" || S.pay === "cod") ? S.pay : "cod";
 S.f=blankF();
 
 function save(){store("cart",S.cart);store("wish",S.wish);store("user",S.user);store("orders",S.orders);store("coupon",S.coupon);store("addr",S.addr)}
-function badges(){
-  const c=S.cart.reduce((s,l)=>s+l.qty,0);
-  $("#cCnt").textContent=c;$("#cCnt").dataset.n=c;
-  $("#wCnt").textContent=S.wish.length;$("#wCnt").dataset.n=S.wish.length;
-  $("#acctLbl").textContent=S.user?"Hi, "+S.user.name.split(" ")[0]:"Login";
+
+
+function badges() {
+  const cartCount = S.cart.reduce((total, item) => total + item.qty, 0);
+
+  // Count only wishlist items that still exist in the product catalogue
+  const validWish = S.wish.map(byId).filter(Boolean);
+  const wishCount = validWish.length;
+
+  // Update cart badge
+  $("#cCnt").textContent = cartCount;
+  $("#cCnt").dataset.n = cartCount;
+
+  // Update wishlist badge
+  $("#wCnt").textContent = wishCount;
+  $("#wCnt").dataset.n = wishCount;
+
+  // Update account label
+  $("#acctLbl").textContent = S.user
+    ? "Hi, " + S.user.name.split(" ")[0]
+    : "Login";
 }
+
+
 let tt;function toast(m){const t=$("#toast");t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2400)}
 
 /* ---------- router ---------- */
@@ -167,7 +182,7 @@ function toAnchor(id){if(S.view!=="home"){S.view="home";render()}const el=docume
 /* ---------- components ---------- */
 const HEART='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>';
 function pcard(p){
-  const w=S.wish.some(id=>String(id)===String(p.id));
+  const w=S.wish.includes(p.id);
   return `<article class="pcard">
     <div class="pw"><a href="#" class="pimg arch" data-act="product" data-id="${p.id}" aria-label="${esc(p.name)}">${art(p)}</a>${p.tag?`<span class="tag">${p.tag}</span>`:""}
     <button class="wishbtn ${w?"on":""}" data-act="wish" data-id="${p.id}" aria-label="${w?"Remove from":"Add to"} wishlist" aria-pressed="${w}">${HEART}</button></div>
@@ -318,11 +333,7 @@ function refresh(){const L=filtered();$("#results").innerHTML=resultsHTML(L);$("
 
 /* ---------- PRODUCT ---------- */
 function vProduct(){
-  const p=byId(S.pid);
-  if(!p){
-    return `<div class="wrap section"><h2>Product not found</h2><p>This product may no longer be available. Please choose a product from the collection.</p><button class="btn" data-act="shop">Back to collection</button></div>`;
-  }
-  const w=S.wish.some(id=>String(id)===String(p.id)),r=Number(p.rating)||0,cl=v=>Math.max(0,Math.round(v));
+  const p=byId(S.pid),w=S.wish.includes(p.id),r=p.rating,cl=v=>Math.max(0,Math.round(v));
   const d5=cl(40+(r-4)*60),d4=cl(35-(r-4)*30),d3=cl(14-(r-4)*14),d2=cl(4-(r-4)*4),d1=Math.max(0,100-d5-d4-d3-d2);
   const sim=P.filter(x=>x.id!==p.id).sort((a,b)=>(b.cat===p.cat)-(a.cat===p.cat)||b.reviews-a.reviews).slice(0,4);
   if(p.free&&!S.size)S.size="Free size";
@@ -360,27 +371,16 @@ function vProduct(){
   <section class="reviews" aria-label="Ratings and reviews">
     <div class="avg"><div class="eyebrow">Ratings &amp; reviews</div><div class="big num">${r.toFixed(1)}<span style="font-size:26px"> ★</span></div><div class="muted" style="font-size:13px">${p.reviews.toLocaleString("en-IN")} verified buyers</div>
       <div class="bars">${[[5,d5],[4,d4],[3,d3],[2,d2],[1,d1]].map(([s,v])=>`<div class="bar"><span>${s}★</span><i><b style="width:${v}%"></b></i><span class="num muted">${v}%</span></div>`).join("")}</div></div>
-    <div>${[0,1,2].map(i=>{const reviewIndex=Array.from(String(p.id??"0")).reduce((n,c)=>n+c.charCodeAt(0),0)+i;const v=RV[reviewIndex%RV.length]||RV[i%RV.length];return `<div class="rv"><div class="row"><span class="star">${v[2]} ★</span><b>${v[3]}</b></div><p>${v[1]}</p><small>${v[0]} · Verified buyer · ${p.free?"Free size":"Size "+["S","M","L"][i]}</small></div>`}).join("")}</div>
+    <div>${[0,1,2].map(i=>{const v=RV[(p.id+i)%RV.length];return `<div class="rv"><div class="row"><span class="star">${v[2]} ★</span><b>${v[3]}</b></div><p>${v[1]}</p><small>${v[0]} · Verified buyer · ${p.free?"Free size":"Size "+["S","M","L"][i]}</small></div>`}).join("")}</div>
   </section>
   <section style="border-top:1px solid var(--line);padding-block:40px 64px"><div class="sec-row"><div><div class="eyebrow">You may also like</div><h2>Pieces like this</h2></div></div><div class="pgrid">${sim.map(pcard).join("")}</div></section>
   </div>`;
 }
 function addToCart(){
   const p=byId(S.pid);
-  const sizeError=$("#sizeErr");
-  if(!p){toast("This product is unavailable. Please open it again from the collection.");return false;}
-  if(!S.size){if(sizeError)sizeError.textContent="Select a size to continue.";return false;}
-  if(!sizesOf(p).some(s=>String(s)===String(S.size)) || (Array.isArray(p.sold)&&p.sold.some(s=>String(s)===String(S.size)))){
-    if(sizeError)sizeError.textContent="This size is currently unavailable. Please choose another size.";
-    return false;
-  }
-  const stock=(p.stock_by_size&&p.stock_by_size[S.size]!=null)?Math.max(0,Number(p.stock_by_size[S.size])||0):null;
-  const maxQty=stock===null?5:Math.min(5,stock);
-  if(maxQty<1){if(sizeError)sizeError.textContent="This size is out of stock.";return false;}
-  const l=S.cart.find(x=>String(x.id)===String(p.id)&&String(x.size)===String(S.size));
-  if(l){if((Number(l.qty)||0)>=maxQty){if(sizeError)sizeError.textContent=`Only ${maxQty} available for this size.`;return false;}l.qty=Math.min(maxQty,(Number(l.qty)||0)+1);}
-  else S.cart.push({id:String(p.id),size:String(S.size),qty:1});
-  if(sizeError)sizeError.textContent="";
+  if(!S.size){$("#sizeErr").textContent="Select a size to continue.";return false}
+  const l=S.cart.find(x=>x.id===p.id&&x.size===S.size);
+  l?l.qty=Math.min(5,l.qty+1):S.cart.push({id:p.id,size:S.size,qty:1});
   save();badges();toast(`Added to bag: ${short(p)}, ${S.size}`);return true;
 }
 
@@ -388,23 +388,17 @@ function addToCart(){
 function vWish(){
   const L=S.wish.map(byId).filter(Boolean);
   return `<div class="wrap"><div class="crumbs"><button data-act="home">Home</button> / Wishlist</div>
-   <div class="shopbar"><div><h1>My wishlist</h1><span class="muted">${L.length} pieces</span></div></div>
+   <div class="shopbar"><div><h1>My wishlist</h1><span class="muted">${L.length} ${L.length === 1 ? "piece" : "pieces"}</span></div></div>
    ${L.length?`<div class="pgrid">${L.map(pcard).join("")}</div>`:`<div class="empty"><h2>Your wishlist is empty</h2><p>Tap the heart on any piece to save it here.</p><button class="btn" data-act="shop">Browse the collection</button></div>`}
    <div style="height:56px"></div></div>`;
 }
 
 /* ---------- CART ---------- */
 function totals(){
-  let mrp=0,price=0,items=0;
-  (Array.isArray(S.cart)?S.cart:[]).forEach(l=>{
-    const p=byId(l&&l.id);if(!p)return;
-    const qty=Math.max(1,Math.min(5,Number(l.qty)||1));
-    mrp+=(Number(p.mrp)||Number(p.price)||0)*qty;
-    price+=(Number(p.price)||0)*qty;items+=qty;
-  });
+  let mrp=0,price=0;S.cart.forEach(l=>{const p=byId(l.id);mrp+=p.mrp*l.qty;price+=p.price*l.qty});
   let c=S.coupon&&COUPONS[S.coupon];if(c&&c.min&&price<c.min)c=null;
   const cdisc=c?c.calc(price):0,ship=price===0||price>=1999||(c&&c.ship)?0:99;
-  return {mrp,price,disc:Math.max(0,mrp-price),cdisc,ship,total:Math.max(0,price-cdisc+ship),validCoupon:c?S.coupon:null,items};
+  return {mrp,price,disc:mrp-price,cdisc,ship,total:price-cdisc+ship,validCoupon:c?S.coupon:null,items:S.cart.reduce((s,l)=>s+l.qty,0)};
 }
 function summaryHTML(withCoupon,btn){
   const t=totals();
@@ -422,15 +416,13 @@ function summaryHTML(withCoupon,btn){
     ${btn}</aside>`;
 }
 function vCart(){
-  S.cart=(Array.isArray(S.cart)?S.cart:[]).filter(l=>l&&byId(l.id));
-  S.cart.forEach(l=>{l.id=String(l.id);l.qty=Math.max(1,Math.min(5,Number(l.qty)||1));});
   if(!S.cart.length)return `<div class="wrap">${stepsBar(0)}<div class="empty"><h2>Your bag is empty</h2><p>Add a few pieces you love and they'll show up here.</p><button class="btn" data-act="shop">Browse the collection</button>${S.wish.length?`<button class="link" data-act="go" data-view="wishlist">Add pieces from your wishlist</button>`:""}</div></div>`;
   return `<div class="wrap">${stepsBar(0)}<div class="two">
     <div class="items">${S.cart.map((l,i)=>{const p=byId(l.id);return `<div class="card item">
       <a href="#" class="pimg" data-act="product" data-id="${p.id}">${art(p)}</a>
       <div><div class="eyebrow">${esc(p.cat)}</div><h3>${p.name}</h3>
         <div class="sel"><select data-cs="${i}" aria-label="Size">${sizesOf(p).filter(s=>!p.sold.includes(s)).map(s=>`<option ${s===l.size?"selected":""}>${s}</option>`).join("")}</select>
-        <select data-cq="${i}" aria-label="Quantity">${Array.from({length:Math.max(1,Math.min(5,(p.stock_by_size&&p.stock_by_size[l.size]!=null)?(Number(p.stock_by_size[l.size])||0):5))},(_,n)=>n+1).map(q=>`<option value="${q}" ${q===l.qty?"selected":""}>Qty ${q}</option>`).join("")}</select></div>
+        <select data-cq="${i}" aria-label="Quantity">${[1,2,3,4,5].map(q=>`<option value="${q}" ${q===l.qty?"selected":""}>Qty ${q}</option>`).join("")}</select></div>
         <div class="muted" style="font-size:12.5px;margin-top:6px">Delivery by ${dateIn(Date.now(),5)} · 7-day exchange</div>
         <div class="acts"><button data-act="rmline" data-i="${i}">Remove</button><button data-act="movewish" data-i="${i}">Move to wishlist</button></div></div>
       <div class="itot" style="text-align:right"><div class="pr"><b>${inr(p.price*l.qty)}</b></div><div class="pr"><s>${inr(p.mrp*l.qty)}</s><span class="off">${off(p)}% off</span></div></div>
@@ -445,80 +437,45 @@ function vCheckout(){
   const f=(id,l,v,extra="")=>`<label class="field ${extra}">${l}<input id="${id}" value="${esc(v||"")}" ${id==="a-pin"?'inputmode="numeric" maxlength="6"':id==="a-phone"?'inputmode="tel" maxlength="10"':""}></label>`;
   return `<div class="wrap">${stepsBar(1)}<div class="two"><div class="items">
     <section class="card box"><div class="row" style="justify-content:space-between"><h2>Delivery address</h2><button class="link" data-act="sampleaddr">Fill sample address</button></div>
-      <div class="grid2">${f("a-name","Full name",a.name||S.user.name)}${f("a-phone","Mobile number",a.phone||S.user.phone)}${f("a-email","Email address",a.email||"", "full")}
+      <div class="grid2">${f("a-name","Full name",a.name||S.user.name)}${f("a-phone","Mobile number",a.phone||S.user.phone)}
       ${f("a-line","House no., building, street",a.line,"full")}${f("a-area","Area / locality",a.area)}${f("a-pin","PIN code",a.pin)}${f("a-city","City",a.city)}${f("a-state","State",a.state)}</div>
     </section>
     <section class="card box"><h2>Payment method</h2>
       <div class="pays">
-        <div class="pay ${S.pay==="online"?"on":""}"><label class="h"><input type="radio" name="pay" value="online" ${S.pay==="online"?"checked":""}>Online payment <small>UPI, cards and net banking via Razorpay secure checkout</small></label></div>
-        <div class="pay ${S.pay==="cod"?"on":""}"><label class="h"><input type="radio" name="pay" value="cod" ${S.pay==="cod"?"checked":""}>Cash on delivery <small>Pay when your order arrives</small></label></div>
+        <div class="pay ${S.pay==="upi"?"on":""}"><label class="h"><input type="radio" name="pay" value="upi" ${S.pay==="upi"?"checked":""}>UPI <small>Google Pay, PhonePe, Paytm, BHIM</small></label>
+          ${S.pay==="upi"?`<label class="field">UPI ID<input id="upi" placeholder="yourname@okaxis"></label>`:""}</div>
+        <div class="pay ${S.pay==="card"?"on":""}"><label class="h"><input type="radio" name="pay" value="card" ${S.pay==="card"?"checked":""}>Credit / Debit card <small>Visa, Mastercard, RuPay</small></label>
+          ${S.pay==="card"?`<div class="grid2"><label class="field full">Card number<input id="cno" inputmode="numeric" maxlength="19" placeholder="4111 1111 1111 1111"></label><label class="field">Expiry (MM/YY)<input id="cexp" maxlength="5" placeholder="08/29"></label><label class="field">CVV<input id="ccvv" inputmode="numeric" maxlength="3" placeholder="123"></label></div>`:""}</div>
+        <div class="pay ${S.pay==="nb"?"on":""}"><label class="h"><input type="radio" name="pay" value="nb" ${S.pay==="nb"?"checked":""}>Net banking <small>All major banks</small></label>
+          ${S.pay==="nb"?`<label class="field">Bank<select id="bank"><option>HDFC Bank</option><option>ICICI Bank</option><option>State Bank of India</option><option>Axis Bank</option><option>Kotak Mahindra Bank</option></select></label>`:""}</div>
+        <div class="pay ${S.pay==="cod"?"on":""}"><label class="h"><input type="radio" name="pay" value="cod" ${S.pay==="cod"?"checked":""}>Cash on delivery <small>Pay in cash or UPI at your door</small></label></div>
       </div>
-      <div class="note">Online payment is available only when Razorpay Test/Live keys are configured on the server. Never enter card details directly on this page.</div>
+      <div class="note">This is a demo checkout. No money is charged, so please don't enter real card details.</div>
       <div class="err" id="coErr"></div>
     </section></div>
     ${summaryHTML(false,`<button class="btn block" data-act="placeorder">Pay ${inr(totals().total)} &amp; place order</button><button class="link" data-act="go" data-view="cart">Back to bag</button>`)}
   </div></div>`;
 }
-function readAddr(){const g=id=>$("#"+id).value.trim();return {name:g("a-name"),phone:g("a-phone").replace(/\D/g,""),email:g("a-email").toLowerCase(),line:g("a-line"),area:g("a-area"),pin:g("a-pin"),city:g("a-city"),state:g("a-state")}}
-async function loadRazorpayCheckout(){
-  if(window.Razorpay)return true;
-  await new Promise((resolve,reject)=>{
-    const script=document.createElement("script");script.src="https://checkout.razorpay.com/v1/checkout.js";
-    script.onload=resolve;script.onerror=()=>reject(new Error("Could not load secure payment checkout."));document.head.appendChild(script);
-  });
-  return Boolean(window.Razorpay);
-}
-async function callCheckoutFunction(name,payload){
-  const base=String(window.LABEL_AWADH_SUPABASE_URL||"").replace(/\/$/,"");
-  const key=String(window.LABEL_AWADH_SUPABASE_KEY||"");
-  if(!base||!key)throw new Error("Store backend is not configured. Please contact the store.");
-  const response=await fetch(`${base}/functions/v1/${name}`,{method:"POST",headers:{"Content-Type":"application/json","apikey":key,"Authorization":`Bearer ${key}`},body:JSON.stringify(payload)});
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(data.error||`Checkout request failed (${response.status}).`);
-  return data;
-}
-function buildServerOrderPayload(a){
-  return {customer:{name:a.name,email:a.email,phone:a.phone,address_line1:a.line,address_line2:a.area,city:a.city,state:a.state,postal_code:a.pin,country:"India"},payment_method:S.pay==="cod"?"cod":"online",coupon_code:totals().validCoupon||null,items:S.cart.map(l=>({product_id:String(l.id),size:String(l.size),quantity:Math.max(1,Math.min(5,Number(l.qty)||1))}))};
-}
-function showConfirmedOrder(serverOrder,a){
-  const orderItems=S.cart.map(l=>{const p=byId(l.id);return p?{id:String(p.id),size:String(l.size),qty:Math.max(1,Math.min(5,Number(l.qty)||1)),price:Number(p.price)||0,name:p.name}:null;});
-  const total=Number(serverOrder.total_paise)/100;
-  const o={id:String(serverOrder.order_number||serverOrder.order_id),serverId:serverOrder.order_id,date:Date.now(),items:orderItems.filter(Boolean),total,save:(Number(serverOrder.discount_paise)||0)/100,coupon:S.coupon,pay:S.pay==="cod"?"Cash on delivery":"Online payment",addr:a,status:serverOrder.status||"pending"};
-  S.addr=a;S.orders.unshift(o);S.cart=[];S.coupon=null;S.lastOrder=o.id;save();go("success");sendOrderToWhatsApp(o);
-}
-async function placeOrder(){
-  const a=readAddr(),e=$("#coErr");e.textContent="";
-  if(Object.values(a).some(v=>!v))return e.textContent="Fill in every address field, including email.";
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email))return e.textContent="Enter a valid email address.";
+function readAddr(){const g=id=>$("#"+id).value.trim();return {name:g("a-name"),phone:g("a-phone").replace(/\D/g,""),line:g("a-line"),area:g("a-area"),pin:g("a-pin"),city:g("a-city"),state:g("a-state")}}
+function placeOrder(){
+  const a=readAddr(),e=$("#coErr");
+  if(Object.values(a).some(v=>!v))return e.textContent="Fill in every address field.";
   if(!/^\d{10}$/.test(a.phone))return e.textContent="Mobile number must be 10 digits.";
   if(!/^\d{6}$/.test(a.pin))return e.textContent="PIN code must be 6 digits.";
-  S.cart=(Array.isArray(S.cart)?S.cart:[]).filter(l=>l&&byId(l.id));
-  if(!S.cart.length)return e.textContent="Your bag is empty or a product is no longer available. Please return to your bag.";
-  if(S.cart.some(l=>!l||!byId(l.id)||!byId(l.id).id))return e.textContent="A product in your bag is unavailable. Please remove it and try again.";
-  const btn=document.querySelector('[data-act="placeorder"]');if(btn){btn.disabled=true;btn.textContent="Processing securely…";}
-  try{
-    // The server validates active product IDs, stock, prices, coupons and totals.
-    const created=await callCheckoutFunction("create-order",buildServerOrderPayload(a));
-    if(S.pay==="cod"){
-      showConfirmedOrder(created,a);
-      return;
-    }
-    const payment=await callCheckoutFunction("create-payment-order",{order_id:created.order_id});
-    await loadRazorpayCheckout();
-    const checkout=new window.Razorpay({key:payment.key_id,amount:payment.amount,currency:payment.currency,name:"Label Awadh",description:`Order #${payment.order_number}`,order_id:payment.razorpay_order_id,prefill:{name:a.name,email:a.email,contact:a.phone},theme:{color:"#C5A253"},modal:{ondismiss:()=>{e.textContent="Payment was not completed. Your order remains pending; please retry or contact the store.";if(btn){btn.disabled=false;btn.textContent=`Pay ${inr(Number(created.total_paise)/100)} & place order`;}}},handler:async function(response){
-      try{
-        await callCheckoutFunction("verify-payment",{order_id:created.order_id,razorpay_order_id:response.razorpay_order_id,razorpay_payment_id:response.razorpay_payment_id,razorpay_signature:response.razorpay_signature});
-        showConfirmedOrder(created,a);
-      }catch(err){e.textContent=err.message||"Payment verification failed. Do not retry payment until order status is checked.";if(btn){btn.disabled=false;btn.textContent=`Pay ${inr(Number(created.total_paise)/100)} & place order`;}}
-    }});
-    checkout.on("payment.failed",function(){e.textContent="Payment failed. Your order is not confirmed. Please retry or choose COD.";if(btn){btn.disabled=false;btn.textContent=`Pay ${inr(Number(created.total_paise)/100)} & place order`;}});
-    checkout.open();
-  }catch(err){e.textContent=err.message||"Could not place order. Please try again.";if(btn){btn.disabled=false;btn.textContent=`Pay ${inr(totals().total)} & place order`;}}
+  if(S.pay==="upi"&&!/^[\w.\-]{2,}@[a-z]{2,}$/i.test(($("#upi").value||"").trim()))return e.textContent="Enter a valid UPI ID, like yourname@okaxis.";
+  if(S.pay==="card"){
+    if($("#cno").value.replace(/\s/g,"").length!==16)return e.textContent="Card number must be 16 digits.";
+    if(!/^(0[1-9]|1[0-2])\/\d{2}$/.test($("#cexp").value))return e.textContent="Enter expiry as MM/YY.";
+    if(!/^\d{3}$/.test($("#ccvv").value))return e.textContent="CVV must be 3 digits.";
+  }
+  const t=totals();
+  const o={id:"LA"+String(Date.now()).slice(-8),date:Date.now(),items:S.cart.map(l=>({...l,price:byId(l.id).price})),total:t.total,save:t.disc+t.cdisc,coupon:t.validCoupon,pay:{upi:"UPI",card:"Card",nb:"Net banking",cod:"Cash on delivery"}[S.pay],addr:a};
+  S.addr=a;S.orders.unshift(o);S.cart=[];S.coupon=null;S.lastOrder=o.id;save();go("success");sendOrderToWhatsApp(o);
 }
 function vSuccess(){
   const o=S.orders.find(x=>x.id===S.lastOrder);if(!o)return vHome();
   return `<div class="wrap">${stepsBar(2)}<div class="done">${MARK}<h1>Thank you, ${esc(o.addr.name.split(" ")[0])}</h1>
-    <p class="muted" style="max-width:48ch">Order <b>#${o.id}</b> for <b>${inr(o.total)}</b> has been placed. Your piece will be wrapped with our tag and cotton tote, and should reach you by <b>${dateIn(o.date,5)}</b>.</p>
+    <p class="muted" style="max-width:48ch">Order <b>#${o.id}</b> for <b>${inr(o.total)}</b> is confirmed. Your piece will be wrapped with our tag and cotton tote, and should reach you by <b>${dateIn(o.date,5)}</b>.</p>
     <p class="muted" style="font-size:13px">Payment: ${o.pay}${o.save?` · You saved ${inr(o.save)}`:""}</p>
     <div class="row" style="justify-content:center"><button class="btn" data-act="go" data-view="orders">Track order</button><button class="btn ghost" data-act="shop">Continue shopping</button></div></div></div>`;
 }
@@ -541,7 +498,7 @@ function vOrders(){
       <div class="obody">
         <div class="status ${st===4?"del":st<0?"can":""}">${st<0?"Cancelled":st===4?"Delivered on "+(o.sample?dateIn(o.date,5):dateIn(Date.now())):STAGES[st]+" · Arriving by "+dateIn(o.date,5)}</div>
         ${st>=0?`<div class="track" aria-label="Tracking: ${STAGES[st]}"><span class="fill" style="width:${pct}%"></span>${STAGES.map((s,i)=>`<div class="tstep ${i<=st?"dn":""}"><i>${i<=st?"✓":""}</i><span>${s}</span></div>`).join("")}</div>`:""}
-        <div class="oitems">${o.items.map(l=>{const p=byId(l.id);if(!p)return "";return `<div class="oitem"><a href="#" class="pimg" data-act="product" data-id="${p.id}">${art(p)}</a><div><b style="font-weight:600">${esc(p.name)}</b><div class="muted" style="font-size:13px">${l.size} · Qty ${l.qty}</div></div><b class="num">${inr(l.price*l.qty)}</b></div>`}).join("")}</div>
+        <div class="oitems">${o.items.map(l=>{const p=byId(l.id);return `<div class="oitem"><a href="#" class="pimg" data-act="product" data-id="${p.id}">${art(p)}</a><div><b style="font-weight:600">${p.name}</b><div class="muted" style="font-size:13px">${l.size} · Qty ${l.qty}</div></div><b class="num">${inr(l.price*l.qty)}</b></div>`}).join("")}</div>
         <div class="row">${st>=0&&st<2?`<button class="btn ghost" data-act="cancel" data-id="${o.id}">Cancel order</button>`:""}${st===4?`<button class="btn ghost" data-act="reorder" data-id="${o.id}">Buy again</button>`:""}<button class="btn ghost" data-act="product" data-id="${o.items[0].id}">View piece</button></div>
       </div></article>`}).join(""):`<div class="empty"><h2>No orders yet</h2><p>When you place an order, you can track it here.</p><button class="btn" data-act="shop">Browse the collection</button></div>`}</div></div>`;
 }
@@ -593,11 +550,45 @@ document.addEventListener("click",e=>{
     case "home":S.f=blankF();$("#q").value="";go("home");break;
     case "go":closeModal();go(d.view);break;
     case "story":toAnchor("story");break;
+
+case "help": {
+  const pages = {
+    shipping: {
+      title: "Shipping & Delivery",
+      body: "Delivery timelines and shipping charges will be confirmed before your order is placed."
+    },
+    returns: {
+      title: "Returns & Exchange",
+      body: "Please contact our support team to confirm return and exchange eligibility."
+    },
+    care: {
+      title: "Caring for Chikankari",
+      body: "Wash gently with mild detergent, avoid harsh scrubbing, and dry in the shade. Follow the garment label for specific care instructions."
+    },
+    contact: {
+      title: "Contact Us",
+      body: "Please add your verified customer-support contact details here."
+    }
+  };
+
+  const page = pages[d.topic];
+
+  if (page) {
+    openModal(
+      `<div class="eyebrow">LABEL AWADH</div>
+       <h2>${page.title}</h2>
+       <p>${page.body}</p>`
+    );
+  }
+
+  break;
+}
+
     case "anchor":toAnchor(d.to);break;
     case "shop":{const f=blankF();if(d.cat)f.cat.add(d.cat);if(d.new)f.neu=true;if(d.q)f.q=d.q;S.f=f;$("#q").value=f.q;closeModal();go("shop");break}
-    case "product":closeModal();go("product",{pid:d.id,img:"front",size:null});break;
-    case "wish":{const id=String(d.id),i=S.wish.findIndex(x=>String(x)===id);i<0?S.wish.push(id):S.wish.splice(i,1);save();toast(i<0?"Saved to wishlist":"Removed from wishlist");
-      if((S.view==="product"&&String(S.pid)===id)||S.view==="wishlist")render();
+    case "product":closeModal();go("product",{pid:+d.id,img:"front",size:null});break;
+    case "wish":{const id=+d.id,i=S.wish.indexOf(id);i<0?S.wish.push(id):S.wish.splice(i,1);save();toast(i<0?"Saved to wishlist":"Removed from wishlist");
+      if(S.view==="product"&&S.pid===id||S.view==="wishlist")render();
       else document.querySelectorAll(`.wishbtn[data-id="${id}"]`).forEach(b=>{const on=i<0;b.classList.toggle("on",on);b.setAttribute("aria-pressed",on);b.setAttribute("aria-label",(on?"Remove from":"Add to")+" wishlist")});badges();break}
     case "account":toggleAcct();break;
     case "logout":S.user=null;save();badges();toast("Logged out");if(["orders","checkout"].includes(S.view))go("home");break;
@@ -635,22 +626,9 @@ document.addEventListener("change",e=>{
   const t=e.target;
   if(t.dataset.f){const k=t.dataset.f;if(k==="cat"||k==="fabric"){t.checked?S.f[k].add(t.value):S.f[k].delete(t.value)}else S.f[k]=t.checked;refresh()}
   else if(t.id==="sort"){S.f.sort=t.value;refresh()}
-  else if(t.dataset.cs!==undefined){
-    const index=Number(t.dataset.cs),l=S.cart[index],p=l&&byId(l.id);
-    if(!l||!p)return;
-    const dup=S.cart.find(x=>x!==l&&String(x.id)===String(l.id)&&String(x.size)===String(t.value));
-    if(dup){const stock=(p.stock_by_size&&p.stock_by_size[t.value]!=null)?Math.max(0,Number(p.stock_by_size[t.value])||0):5;dup.qty=Math.min(5,stock||5,(Number(dup.qty)||1)+(Number(l.qty)||1));S.cart.splice(index,1)}
-    else if(Array.isArray(p.sold)&&p.sold.some(sz=>String(sz)===String(t.value))){toast("That size is out of stock.");}
-    else l.size=String(t.value);
-    save();render();
-  }
-  else if(t.dataset.cq!==undefined){
-    const index=Number(t.dataset.cq),l=S.cart[index],p=l&&byId(l.id);if(!l||!p)return;
-    const stock=(p.stock_by_size&&p.stock_by_size[l.size]!=null)?Math.max(0,Number(p.stock_by_size[l.size])||0):5;
-    if(stock<1||(Array.isArray(p.sold)&&p.sold.some(sz=>String(sz)===String(l.size)))){toast("This size is out of stock.");return;}
-    l.qty=Math.max(1,Math.min(5,stock,Number(t.value)||1));save();render();
-  }
-  else if(t.name==="pay"){const keep=["a-name","a-phone","a-email","a-line","a-area","a-pin","a-city","a-state"].map(i=>[i,$("#"+i).value]);S.pay=t.value;render();keep.forEach(([i,v])=>$("#"+i).value=v)}
+  else if(t.dataset.cs!==undefined){const l=S.cart[+t.dataset.cs],dup=S.cart.find(x=>x!==l&&x.id===l.id&&x.size===t.value);if(dup){dup.qty=Math.min(5,dup.qty+l.qty);S.cart.splice(+t.dataset.cs,1)}else l.size=t.value;save();render()}
+  else if(t.dataset.cq!==undefined){S.cart[+t.dataset.cq].qty=+t.value;save();render()}
+  else if(t.name==="pay"){const keep=["a-name","a-phone","a-line","a-area","a-pin","a-city","a-state"].map(i=>[i,$("#"+i).value]);S.pay=t.value;render();keep.forEach(([i,v])=>$("#"+i).value=v)}
 });
 document.addEventListener("input",e=>{
   const t=e.target;
@@ -682,36 +660,5 @@ function suggest(v){
     cats.map(c=>`<button data-act="shop" data-cat="${esc(c)}"><b>${esc(c)}</b><small>Silhouette</small></button>`).join("")+prods.map(p=>`<button data-act="product" data-id="${p.id}"><span class="s-art">${art(p)}</span>${p.name}<small>${inr(p.price)}</small></button>`).join("")+`<button data-act="shop" data-q="${esc(v)}">See all results for “${esc(v)}”</button>`;
   box.hidden=false;
 }
-
-/* Supabase product loader — compatible with the actual Label Awadh products schema */
-window.LabelAwadhLoadProducts = function (rows) {
-  if (!Array.isArray(rows) || rows.length === 0) {
-    console.warn("Label Awadh: no product rows received; keeping current catalogue.");
-    return;
-  }
-  const categoryMap = {"Kurtas":"kurta","Short Kurtis":"short","Kurta Sets":"set","Anarkalis":"anarkali","Dupattas":"dupatta","Sarees":"saree","Chikankari Suits":"kurta"};
-  const palette = ["#F2EBDD","#E8C5C1","#C3DACB","#F8F6F1","#BDD1E0","#EAC55C","#C2A1B3","#D9C3A5"];
-  const mapped = rows.filter(row => row && row.id != null && row.active !== false).map((row, i) => {
-    const rawPrice = row.price_paise != null ? Number(row.price_paise) / 100 : Number(row.price ?? 0);
-    const rawMrp = row.compare_at_price_paise != null ? Number(row.compare_at_price_paise) / 100 : Number(row.compare_at_price ?? rawPrice);
-    const images = Array.isArray(row.image_urls) ? row.image_urls.filter(url => typeof url === "string" && url.trim()) : (row.image_url ? [row.image_url] : (Array.isArray(row.images) ? row.images : []));
-    const stock = row.stock_by_size && typeof row.stock_by_size === "object" ? row.stock_by_size : {};
-    const sizes = Array.isArray(row.sizes) ? row.sizes.map(s => String(s).trim()).filter(Boolean) : (typeof row.sizes === "string" ? row.sizes.split(",").map(s => s.trim()).filter(Boolean) : ["S","M","L","XL"]);
-    const free = sizes.length === 1 && sizes[0].toLowerCase().startsWith("free");
-    // Treat a size as sold out only when inventory explicitly reports zero. Missing stock_by_size data must not disable every size.
-    const sold = free ? [] : sizes.filter(size => stock[size] != null && Number(stock[size]) <= 0);
-    const cat = row.category || "Chikankari Suits";
-    const colour = row.colour || row.color || "Ivory";
-    const price = Number.isFinite(rawPrice) ? rawPrice : 0;
-    const mrp = Number.isFinite(rawMrp) && rawMrp >= price ? rawMrp : price;
-    return {id:String(row.id),slug:row.slug||"",name:row.name||"Chikankari Collection",cat,category:cat,shape:categoryMap[cat]||"kurta",colour,color:colour,hex:row.hex||palette[i%palette.length],thread:row.thread||"#BFAE90",fabric:row.fabric||"Chikankari fabric",stitch:row.stitch||"Hand embroidery",days:Number(row.days)||14,price,mrp,rating:Number(row.rating)||5,reviews:Number(row.reviews)||0,sold,tag:row.tag||"",fit:row.fit||"Handcrafted fit",desc:row.description||row.desc||"Hand-embroidered chikankari piece.",description:row.description||row.desc||"",image_urls:images,image_url:images[0]||"",images,sizes:free?["Free size"]:(sizes.length?sizes:["S","M","L","XL"]),free,stock_by_size:stock,stock:Object.values(stock).reduce((sum,value)=>sum+Math.max(0,Number(value)||0),0),active:row.active!==false};
-  });
-  if (!mapped.length) { console.warn("Label Awadh: no valid active products received; keeping current catalogue."); return; }
-  P.splice(0, P.length, ...mapped);
-  S.cart = (Array.isArray(S.cart) ? S.cart : []).map(item => ({...item,id:String(item.id)}));
-  S.wish = (Array.isArray(S.wish) ? S.wish : []).map(id => String(id));
-  save();
-  render();
-};
 
 render();
