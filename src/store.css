@@ -379,3 +379,79 @@ table.chart{border-collapse:collapse;width:100%;font-size:14px;font-variant-nume
 table.chart th,table.chart td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
 table.chart th{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;font-size:14px;z-index:60;max-width:calc(100% - 32px)}
+
+
+/* Label Awadh - Mobile Responsive Polish */
+@media (max-width: 640px) {
+  .wrap {
+    padding-left: 14px;
+    padding-right: 14px;
+    box-sizing: border-box;
+  }
+
+  .pgrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px 10px;
+  }
+
+  .pcard {
+    min-width: 0;
+  }
+
+  .pc-body h3 {
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  .pc-body .sub {
+    font-size: 11px;
+  }
+
+  .shopbar {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .shopbar h1 {
+    font-size: 27px;
+  }
+
+  .shopbar select {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .fbtn {
+    min-height: 40px;
+  }
+
+  .shop,
+  .pdp,
+  .info,
+  .gallery {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .mainimg {
+    width: 100%;
+    aspect-ratio: 4 / 5;
+  }
+
+  .mainimg img,
+  .mainimg svg {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .info .row {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .info .row .btn {
+    min-width: 0;
+  }
+}
