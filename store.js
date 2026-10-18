@@ -550,6 +550,40 @@ document.addEventListener("click",e=>{
     case "home":S.f=blankF();$("#q").value="";go("home");break;
     case "go":closeModal();go(d.view);break;
     case "story":toAnchor("story");break;
+
+case "help": {
+  const pages = {
+    shipping: {
+      title: "Shipping & Delivery",
+      body: "Delivery timelines and shipping charges will be confirmed before your order is placed."
+    },
+    returns: {
+      title: "Returns & Exchange",
+      body: "Please contact our support team to confirm return and exchange eligibility."
+    },
+    care: {
+      title: "Caring for Chikankari",
+      body: "Wash gently with mild detergent, avoid harsh scrubbing, and dry in the shade. Follow the garment label for specific care instructions."
+    },
+    contact: {
+      title: "Contact Us",
+      body: "Please add your verified customer-support contact details here."
+    }
+  };
+
+  const page = pages[d.topic];
+
+  if (page) {
+    openModal(
+      `<div class="eyebrow">LABEL AWADH</div>
+       <h2>${page.title}</h2>
+       <p>${page.body}</p>`
+    );
+  }
+
+  break;
+}
+
     case "anchor":toAnchor(d.to);break;
     case "shop":{const f=blankF();if(d.cat)f.cat.add(d.cat);if(d.new)f.neu=true;if(d.q)f.q=d.q;S.f=f;$("#q").value=f.q;closeModal();go("shop");break}
     case "product":closeModal();go("product",{pid:+d.id,img:"front",size:null});break;
