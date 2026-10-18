@@ -144,17 +144,28 @@ S.f=blankF();
 
 function save(){store("cart",S.cart);store("wish",S.wish);store("user",S.user);store("orders",S.orders);store("coupon",S.coupon);store("addr",S.addr)}
 
-function badges(){
-  const c = S.cart.reduce((s, l) => s + l.qty, 0);
+
+function badges() {
+  const cartCount = S.cart.reduce((total, item) => total + item.qty, 0);
+
+  // Count only wishlist items that still exist in the product catalogue
   const validWish = S.wish.map(byId).filter(Boolean);
-  $("#cCnt").textContent = c;
-  $("#cCnt").dataset.n = c;
-  $("#wCnt").textContent = validWish.length;
-  $("#wCnt").dataset.n = validWish.length;
+  const wishCount = validWish.length;
+
+  // Update cart badge
+  $("#cCnt").textContent = cartCount;
+  $("#cCnt").dataset.n = cartCount;
+
+  // Update wishlist badge
+  $("#wCnt").textContent = wishCount;
+  $("#wCnt").dataset.n = wishCount;
+
+  // Update account label
   $("#acctLbl").textContent = S.user
     ? "Hi, " + S.user.name.split(" ")[0]
     : "Login";
 }
+
 
 let tt;function toast(m){const t=$("#toast");t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2400)}
 
@@ -377,7 +388,7 @@ function addToCart(){
 function vWish(){
   const L=S.wish.map(byId).filter(Boolean);
   return `<div class="wrap"><div class="crumbs"><button data-act="home">Home</button> / Wishlist</div>
-   <div class="shopbar"><div><h1>My wishlist</h1><span class="muted">${L.length} pieces</span></div></div>
+   <div class="shopbar"><div><h1>My wishlist</h1><span class="muted">${L.length} ${L.length === 1 ? "piece" : "pieces"}</span></div></div>
    ${L.length?`<div class="pgrid">${L.map(pcard).join("")}</div>`:`<div class="empty"><h2>Your wishlist is empty</h2><p>Tap the heart on any piece to save it here.</p><button class="btn" data-act="shop">Browse the collection</button></div>`}
    <div style="height:56px"></div></div>`;
 }
