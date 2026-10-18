@@ -143,12 +143,19 @@ const blankF=()=>({q:"",cat:new Set(),size:new Set(),colour:new Set(),fabric:new
 S.f=blankF();
 
 function save(){store("cart",S.cart);store("wish",S.wish);store("user",S.user);store("orders",S.orders);store("coupon",S.coupon);store("addr",S.addr)}
+
 function badges(){
-  const c=S.cart.reduce((s,l)=>s+l.qty,0);
-  $("#cCnt").textContent=c;$("#cCnt").dataset.n=c;
-  $("#wCnt").textContent=S.wish.length;$("#wCnt").dataset.n=S.wish.length;
-  $("#acctLbl").textContent=S.user?"Hi, "+S.user.name.split(" ")[0]:"Login";
+  const c = S.cart.reduce((s, l) => s + l.qty, 0);
+  const validWish = S.wish.map(byId).filter(Boolean);
+  $("#cCnt").textContent = c;
+  $("#cCnt").dataset.n = c;
+  $("#wCnt").textContent = validWish.length;
+  $("#wCnt").dataset.n = validWish.length;
+  $("#acctLbl").textContent = S.user
+    ? "Hi, " + S.user.name.split(" ")[0]
+    : "Login";
 }
+
 let tt;function toast(m){const t=$("#toast");t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2400)}
 
 /* ---------- router ---------- */
