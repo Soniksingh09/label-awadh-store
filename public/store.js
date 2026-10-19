@@ -715,3 +715,53 @@ window.LabelAwadhLoadProducts = function (rows) {
 };
 
 render();
+
+/* Help section fix — keeps existing store functionality */
+document.addEventListener("click", function (e) {
+  const button = e.target.closest('[data-act="help"]');
+
+  if (button) {
+    e.preventDefault();
+
+    const pages = {
+      shipping: {
+        title: "Shipping & Delivery",
+        body: "Delivery timelines and shipping charges will be confirmed before your order is placed."
+      },
+      returns: {
+        title: "Returns & Exchange",
+        body: "Please contact our support team to confirm return and exchange eligibility."
+      },
+      care: {
+        title: "Caring for Chikankari",
+        body: "Wash gently with mild detergent, avoid harsh scrubbing, and dry in the shade. Follow the garment label for specific care instructions."
+      },
+      contact: {
+        title: "Contact Us",
+        body: "Please add your verified customer-support contact details here."
+      }
+    };
+
+    const page = pages[button.dataset.topic];
+    const modal = document.getElementById("modal");
+    const box = document.getElementById("mbox");
+
+    if (!page || !modal || !box) return;
+
+    box.innerHTML = `
+      <button type="button" class="x" data-help-close aria-label="Close">×</button>
+      <div class="eyebrow">LABEL AWADH</div>
+      <h2>${page.title}</h2>
+      <p>${page.body}</p>
+    `;
+
+    modal.hidden = false;
+    return;
+  }
+
+  if (e.target.closest("[data-help-close]") ||
+      e.target.id === "modal") {
+    const modal = document.getElementById("modal");
+    if (modal) modal.hidden = true;
+  }
+});
