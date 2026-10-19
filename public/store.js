@@ -155,7 +155,7 @@ function badges(){
 let tt;function toast(m){const t=$("#toast");t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2400)}
 
 /* ---------- router ---------- */
-const VIEWS={home:vHome,shop:vShop,product:vProduct,wishlist:vWish,cart:vCart,checkout:vCheckout,success:vSuccess,orders:vOrders};
+const VIEWS={home:vHome,shop:vShop,product:vProduct,wishlist:vWish,cart:vCart,checkout:vCheckout,success:vSuccess,orders:vOrders,help:vHelp};
 function go(view,params={}){
   if((view==="checkout"||view==="orders")&&!S.user){S.after=()=>go(view,params);openLogin();return}
   if(view==="checkout"&&!S.cart.length)view="cart";
@@ -546,6 +546,72 @@ function vOrders(){
       </div></article>`}).join(""):`<div class="empty"><h2>No orders yet</h2><p>When you place an order, you can track it here.</p><button class="btn" data-act="shop">Browse the collection</button></div>`}</div></div>`;
 }
 
+
+function vHelp(){
+  const pages = {
+    shipping: {
+      title: "Shipping & Delivery",
+      body: `
+        <p>We aim to dispatch your order as soon as it is ready.</p>
+        <p>Delivery timelines and shipping charges will be confirmed before
+        your order is placed. Please check your address and PIN code carefully.</p>
+      `
+    },
+    returns: {
+      title: "Returns & Exchange",
+      body: `
+        <p>If your product arrives damaged or you need help with an exchange,
+        please contact customer support with your order ID.</p>
+        <p>Returns, exchange eligibility and refund timelines will follow
+        the store's confirmed policy.</p>
+      `
+    },
+    care: {
+      title: "Caring for Chikankari",
+      body: `
+        <p>Wash gently with mild detergent and avoid harsh scrubbing.</p>
+        <p>Dry in the shade and avoid excessive wringing.</p>
+        <p>Always follow the care label for your specific garment.</p>
+      `
+    },
+    contact: {
+      title: "Contact Us",
+      body: `
+        <p>Need help with an order or product?</p>
+        <p>Email: Add your verified support email.</p>
+        <p>WhatsApp: Add your verified business number.</p>
+        <p>Please keep your order ID ready when contacting support.</p>
+      `
+    }
+  };
+
+  const page = pages[S.helpTopic] || pages.shipping;
+
+  return `
+    <div class="wrap">
+      <div class="crumbs">
+        <button data-act="home">Home</button> / Help / ${page.title}
+      </div>
+      <div class="shopbar">
+        <div>
+          <h1>${page.title}</h1>
+        </div>
+      </div>
+      <section class="panel" style="padding:28px; margin:24px 0 50px;">
+        ${page.body}
+        <button class="btn ghost" data-act="helpback">Back</button>
+      </section>
+    </div>
+  `;
+}
+
+
+
+
+
+
+
+
 /* ---------- modals ---------- */
 let lastFocus=null;
 function openModal(html,wide){lastFocus=document.activeElement;$("#mbox").className="mbox"+(wide?" wide":"");$("#mbox").innerHTML=`<button class="x" data-act="mclose" aria-label="Close">×</button>`+html;$("#modal").hidden=false;const f=$("#mbox input")||$("#mbox .x");f&&f.focus()}
@@ -561,6 +627,10 @@ function paintLogin(){
     <div class="note">Demo OTP: <b>1234</b></div><div class="err" id="lerr"></div><button class="btn block" data-act="verifyotp">Verify &amp; continue</button>`);
   else openModal(`<div class="eyebrow">Almost done</div><h2>What's your name?</h2><label class="field">Full name<input id="nm" placeholder="Your full name" autocomplete="name"></label><div class="err" id="lerr"></div><button class="btn block" data-act="savename">Continue</button>`);
 }
+
+
+
+
 function loginDone(name){
   S.user={phone:S.login.phone,name};
   if(!S.orders.length)S.orders.push({id:"LA48213077",date:Date.now()-14*864e5,sample:true,items:[{id:1,size:"M",qty:1,price:2450},{id:8,size:"Free size",qty:1,price:1450}],total:3900,save:850,pay:"UPI",addr:{name,city:"Lucknow"}});
@@ -589,16 +659,32 @@ document.addEventListener("click",e=>{
   e.preventDefault();
   const d=t.dataset,a=d.act;
   if(t.closest("#acctMenu"))m.hidden=true;
-  switch(a){
+ 
+switch(a){
     case "home":S.f=blankF();$("#q").value="";go("home");break;
     case "go":closeModal();go(d.view);break;
     case "story":toAnchor("story");break;
     case "anchor":toAnchor(d.to);break;
+
     case "shop":{const f=blankF();if(d.cat)f.cat.add(d.cat);if(d.new)f.neu=true;if(d.q)f.q=d.q;S.f=f;$("#q").value=f.q;closeModal();go("shop");break}
     case "product":closeModal();go("product",{pid:d.id,img:"front",size:null});break;
+
+    // HELP PAGE NAVIGATION
+    case "help":
+      S.helpTopic = d.topic || "shipping";
+      closeModal();
+      go("help");
+      break;
+
+    case "helpback":
+      closeModal();
+      go("home");
+      break;
+
     case "wish":{const id=String(d.id),i=S.wish.findIndex(x=>String(x)===id);i<0?S.wish.push(id):S.wish.splice(i,1);save();toast(i<0?"Saved to wishlist":"Removed from wishlist");
       if((S.view==="product"&&String(S.pid)===id)||S.view==="wishlist")render();
       else document.querySelectorAll(`.wishbtn[data-id="${id}"]`).forEach(b=>{const on=i<0;b.classList.toggle("on",on);b.setAttribute("aria-pressed",on);b.setAttribute("aria-label",(on?"Remove from":"Add to")+" wishlist")});badges();break}
+
     case "account":toggleAcct();break;
     case "logout":S.user=null;save();badges();toast("Logged out");if(["orders","checkout"].includes(S.view))go("home");break;
     case "fset":{const s=S.f[d.k];s.has(d.v)?s.delete(d.v):s.add(d.v);t.setAttribute("aria-pressed",s.has(d.v));refresh();break}
@@ -631,6 +717,7 @@ document.addEventListener("click",e=>{
     case "mclose":closeModal();break;
   }
 });
+
 document.addEventListener("change",e=>{
   const t=e.target;
   if(t.dataset.f){const k=t.dataset.f;if(k==="cat"||k==="fabric"){t.checked?S.f[k].add(t.value):S.f[k].delete(t.value)}else S.f[k]=t.checked;refresh()}
