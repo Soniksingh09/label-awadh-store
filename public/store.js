@@ -524,12 +524,27 @@ function vSuccess(){
 }
 
 /* ---------- ORDERS ---------- */
-function stageOf(o){if(o.cancelled)return -1;if(o.sample)return 4;return Math.min(4,Math.floor((Date.now()-o.date)/60000))}
+
+function stageOf(o) {
+  if (o.cancelled || o.status === 'cancelled') return -1;
+
+  const statusStages = {
+    pending: 0,
+    confirmed: 0,
+    processing: 1,
+    packed: 1,
+    shipped: 2,
+    'out for delivery': 3,
+    delivered: 4
+  };
+
+  const status = String(o.status || 'pending').toLowerCase();
+  return statusStages[status] ?? 0;
+}
 function vOrders(){
   const L=S.orders;
   return `<div class="wrap"><div class="crumbs"><button data-act="home">Home</button> / My orders</div>
   <div class="shopbar"><div><h1>My orders</h1><span class="muted">${L.length} order${L.length===1?"":"s"}</span></div></div>
-  ${L.length?`<div class="note" style="margin-bottom:14px">Demo tracking: a new order moves one step forward every minute, so you can watch it reach “Delivered”.</div>`:""}
   <div class="items" style="padding-bottom:56px">${L.length?L.map(o=>{
     const st=stageOf(o),pct=st<0?0:st/4*80;
     return `<article class="card order"><div class="ohead">
