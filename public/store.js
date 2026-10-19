@@ -552,35 +552,93 @@ function vHelp(){
     shipping: {
       title: "Shipping & Delivery",
       body: `
-        <p>We aim to dispatch your order as soon as it is ready.</p>
-        <p>Delivery timelines and shipping charges will be confirmed before
-        your order is placed. Please check your address and PIN code carefully.</p>
+        <h2>Shipping Information</h2>
+        <p>Thank you for choosing Label Awadh. We carefully prepare
+        each order so your chikankari pieces reach you in good condition.</p>
+
+        <h3>Order Processing</h3>
+        <p>Your order will be processed after confirmation. Dispatch
+        timelines may vary depending on product availability.</p>
+
+        <h3>Delivery Time</h3>
+        <p>Delivery timelines depend on your delivery PIN code
+        and courier service. Please provide a complete and accurate address.</p>
+
+        <h3>Shipping Charges</h3>
+        <p>Applicable shipping charges, if any, will be shown
+        before you confirm your order.</p>
+
+        <h3>Need Help?</h3>
+        <p>Contact our support team with your order ID for
+        assistance with delivery.</p>
       `
     },
+
     returns: {
       title: "Returns & Exchange",
       body: `
-        <p>If your product arrives damaged or you need help with an exchange,
-        please contact customer support with your order ID.</p>
-        <p>Returns, exchange eligibility and refund timelines will follow
-        the store's confirmed policy.</p>
+        <h2>Our Returns & Exchange Support</h2>
+        <p>At Label Awadh, we want you to feel confident about your purchase.</p>
+
+        <h3>Damaged or Incorrect Products</h3>
+        <p>If your product arrives damaged or you receive an incorrect item,
+        contact our support team with your order ID and product photographs.</p>
+
+        <h3>Exchange Requests</h3>
+        <p>Please contact our team to confirm whether your item
+        is eligible for an exchange.</p>
+
+        <h3>Refunds</h3>
+        <p>Refund eligibility and processing timelines will be confirmed
+        by customer support according to the applicable store policy.</p>
+
+        <p>Please confirm your return and exchange policy before publishing
+        specific eligibility periods or refund promises.</p>
       `
     },
+
     care: {
       title: "Caring for Chikankari",
       body: `
-        <p>Wash gently with mild detergent and avoid harsh scrubbing.</p>
+        <h2>Keep Your Chikankari Beautiful</h2>
+        <p>Chikankari embroidery deserves gentle care to help preserve
+        its delicate detailing.</p>
+
+        <h3>Washing</h3>
+        <p>Use a gentle wash method and mild detergent. Avoid harsh
+        scrubbing or twisting embroidered areas.</p>
+
+        <h3>Drying</h3>
         <p>Dry in the shade and avoid excessive wringing.</p>
-        <p>Always follow the care label for your specific garment.</p>
+
+        <h3>Ironing</h3>
+        <p>Use an appropriate low heat setting and check the garment's
+        care label before ironing embroidered sections.</p>
+
+        <h3>Storage</h3>
+        <p>Store your garment in a clean, dry place away from direct sunlight.</p>
+
+        <p>Always follow the care label provided with your specific garment.</p>
       `
     },
+
     contact: {
       title: "Contact Us",
       body: `
-        <p>Need help with an order or product?</p>
-        <p>Email: Add your verified support email.</p>
-        <p>WhatsApp: Add your verified business number.</p>
-        <p>Please keep your order ID ready when contacting support.</p>
+        <h2>We're Here to Help</h2>
+        <p>Have a question about a product, order, delivery, or exchange?
+        Our customer support team is here to help.</p>
+
+        <h3>Order Support</h3>
+        <p>Please keep your order ID ready so we can assist you efficiently.</p>
+
+        <h3>Email Support</h3>
+        <p>Replace this text with your verified customer-support email.</p>
+
+        <h3>WhatsApp Support</h3>
+        <p>Replace this text with your verified business WhatsApp number.</p>
+
+        <p>We look forward to helping you with your Label Awadh purchase.</p>
       `
     }
   };
@@ -592,11 +650,13 @@ function vHelp(){
       <div class="crumbs">
         <button data-act="home">Home</button> / Help / ${page.title}
       </div>
+
       <div class="shopbar">
         <div>
           <h1>${page.title}</h1>
         </div>
       </div>
+
       <section class="panel" style="padding:28px; margin:24px 0 50px;">
         ${page.body}
         <button class="btn ghost" data-act="helpback">Back</button>
@@ -604,7 +664,6 @@ function vHelp(){
     </div>
   `;
 }
-
 
 
 
