@@ -752,15 +752,17 @@ document.addEventListener("click", function (e) {
       <button type="button" class="x" data-help-close aria-label="Close">×</button>
       <div class="eyebrow">LABEL AWADH</div>
       <h2>${page.title}</h2>
-      <p>${page.body}</p>
+      <div>${page.body}</div>
     `;
 
     modal.hidden = false;
     return;
   }
 
-  if (e.target.closest("[data-help-close]") ||
-      e.target.id === "modal") {
+  if (
+    e.target.closest("[data-help-close]") ||
+    e.target.id === "modal"
+  ) {
     const modal = document.getElementById("modal");
     if (modal) modal.hidden = true;
   }
