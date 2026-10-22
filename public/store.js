@@ -1,6 +1,6 @@
 // SET THIS to your WhatsApp Business number in international format, digits only.
 // Example for India: 919876543210 (do not include +, spaces, or dashes).
-const BUSINESS_WHATSAPP = "";
+const BUSINESS_WHATSAPP = "918006754268";
 function sendOrderToWhatsApp(order) {
   if (!/^\d{10,15}$/.test(BUSINESS_WHATSAPP)) return;
   const lines = [
