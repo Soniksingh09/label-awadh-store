@@ -440,26 +440,128 @@ function vCart(){
 }
 
 /* ---------- CHECKOUT ---------- */
-function vCheckout(){
-  const a=S.addr||{};
-  const f=(id,l,v,extra="")=>`<label class="field ${extra}">${l}<input id="${id}" value="${esc(v||"")}" ${id==="a-pin"?'inputmode="numeric" maxlength="6"':id==="a-phone"?'inputmode="tel" maxlength="10"':""}></label>`;
+
+function vCheckout() {
+  S.pay = "cod";
+
+  const a = S.addr || {};
+  const f = (id, l, v, extra = "") =>
+    `<label class="field ${extra}">${l}<input id="${id}" value="${esc(v || "")}" ${
+      id === "a-pin"
+        ? 'inputmode="numeric" maxlength="6"'
+        : id === "a-phone"
+        ? 'inputmode="tel" maxlength="10"'
+        : ""
+    }></label>`;
+
   return `<div class="wrap">${stepsBar(1)}<div class="two"><div class="items">
-    <section class="card box"><div class="row" style="justify-content:space-between"><h2>Delivery address</h2><button class="link" data-act="sampleaddr">Fill sample address</button></div>
-      <div class="grid2">${f("a-name","Full name",a.name||S.user.name)}${f("a-phone","Mobile number",a.phone||S.user.phone)}${f("a-email","Email address",a.email||"", "full")}
-      ${f("a-line","House no., building, street",a.line,"full")}${f("a-area","Area / locality",a.area)}${f("a-pin","PIN code",a.pin)}${f("a-city","City",a.city)}${f("a-state","State",a.state)}</div>
-    </section>
-    <section class="card box"><h2>Payment method</h2>
-      <div class="pays">
-        <div class="pay ${S.pay==="online"?"on":""}"><label class="h"><input type="radio" name="pay" value="online" ${S.pay==="online"?"checked":""}>Online payment <small>UPI, cards and net banking via Razorpay secure checkout</small></label></div>
-        <div class="pay ${S.pay==="cod"?"on":""}"><label class="h"><input type="radio" name="pay" value="cod" ${S.pay==="cod"?"checked":""}>Cash on delivery <small>Pay when your order arrives</small></label></div>
+    <section class="card box">
+      <div class="row" style="justify-content:space-between">
+        <h2>Delivery address</h2>
+        <button class="link" data-act="sampleaddr">Fill sample address</button>
       </div>
-      <div class="note">Online payment is available only when Razorpay Test/Live keys are configured on the server. Never enter card details directly on this page.</div>
+      <div class="grid2">
+        ${f("a-name", "Full name", a.name || S.user.name)}
+        ${f("a-phone", "Mobile number", a.phone || S.user.phone)}
+        ${f("a-email", "Email address", a.email || "", "full")}
+        ${f("a-line", "House no., building, street", a.line, "full")}
+        ${f("a-area", "Area / locality", a.area)}
+        ${f("a-pin", "PIN code", a.pin)}
+        ${f("a-city", "City", a.city)}
+        ${f("a-state", "State", a.state)}
+      </div>
+    </section>
+
+    <section class="card box">
+      <h2>Payment method</h2>
+      <div class="pays">
+        <div class="pay on">
+          <label class="h">
+            <input type="radio" name="pay" value="cod" checked>
+            Cash on delivery
+            <small>Pay when your order arrives</small>
+          </label>
+        </div>
+      </div>
       <div class="err" id="coErr"></div>
-    </section></div>
-    ${summaryHTML(false,`<button class="btn block" data-act="placeorder">Pay ${inr(totals().total)} &amp; place order</button><button class="link" data-act="go" data-view="cart">Back to bag</button>`)}
+    </section>
+  </div>
+
+  ${summaryHTML(false, `
+    <button class="btn block" data-act="placeorder">
+      Place COD Order — ${inr(totals().total)}
+    </button>
+    <button class="btn block" data-act="whatsapporder" style="margin-top:10px">
+      Order on WhatsApp
+    </button>
+    <button class="link" data-act="go" data-view="cart">Back to bag</button>
+  `)}
   </div></div>`;
 }
+
 function readAddr(){const g=id=>$("#"+id).value.trim();return {name:g("a-name"),phone:g("a-phone").replace(/\D/g,""),email:g("a-email").toLowerCase(),line:g("a-line"),area:g("a-area"),pin:g("a-pin"),city:g("a-city"),state:g("a-state")}}
+function startWhatsAppOrder() {
+  const e = document.querySelector("#coErr");
+  const a = readAddr();
+
+  if (e) e.textContent = "";
+
+  if (Object.values(a).some(v => !v)) {
+    if (e) e.textContent = "Please fill in all delivery details.";
+    return;
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email)) {
+    if (e) e.textContent = "Enter a valid email address.";
+    return;
+  }
+
+  if (!/^[6-9]\d{9}$/.test(a.phone)) {
+    if (e) e.textContent = "Enter a valid 10-digit mobile number.";
+    return;
+  }
+
+  if (!/^\d{6}$/.test(a.pin)) {
+    if (e) e.textContent = "Enter a valid 6-digit PIN code.";
+    return;
+  }
+
+  const cart = (Array.isArray(S.cart) ? S.cart : [])
+    .filter(l => l && byId(l.id));
+
+  if (!cart.length) {
+    if (e) e.textContent = "Your bag is empty.";
+    return;
+  }
+
+  const items = cart.map(l => {
+    const p = byId(l.id);
+    return `${p.name} | Size: ${l.size} | Qty: ${l.qty} | Price: ${inr(Number(p.price) * Number(l.qty))}`;
+  });
+
+  const message = [
+    "Hello Label Awadh Store! I would like to place an order.",
+    "",
+    "ORDER DETAILS",
+    ...items,
+    "",
+    `Subtotal: ${inr(totals().price)}`,
+    `Total: ${inr(totals().total)}`,
+    "",
+    "DELIVERY DETAILS",
+    `Name: ${a.name}`,
+    `Phone: ${a.phone}`,
+    `Email: ${a.email}`,
+    `Address: ${a.line}, ${a.area}, ${a.city}, ${a.state} - ${a.pin}`,
+    "",
+    "Please confirm my order."
+  ].join("\n");
+
+  const number = "918006754268";
+  const url = `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+
+  window.open(url, "_blank", "noopener,noreferrer");
+}
 async function loadRazorpayCheckout(){
   if(window.Razorpay)return true;
   await new Promise((resolve,reject)=>{
@@ -477,9 +579,33 @@ async function callCheckoutFunction(name,payload){
   if(!response.ok)throw new Error(data.error||`Checkout request failed (${response.status}).`);
   return data;
 }
-function buildServerOrderPayload(a){
-  return {customer:{name:a.name,email:a.email,phone:a.phone,address_line1:a.line,address_line2:a.area,city:a.city,state:a.state,postal_code:a.pin,country:"India"},payment_method:S.pay==="cod"?"cod":"online",coupon_code:totals().validCoupon||null,items:S.cart.map(l=>({product_id:String(l.id),size:String(l.size),quantity:Math.max(1,Math.min(5,Number(l.qty)||1))}))};
+
+function buildServerOrderPayload(a) {
+  return {
+    customer: {
+      name: a.name,
+      email: a.email,
+      phone: a.phone,
+      address_line1: a.line,
+      address_line2: a.area,
+      city: a.city,
+      state: a.state,
+      postal_code: a.pin,
+      country: "India"
+    },
+    payment_method: "cod",
+    coupon_code: totals().validCoupon || null,
+    items: S.cart.map(l => ({
+      product_id: String(l.id),
+      size: String(l.size),
+      quantity: Math.max(
+        1,
+        Math.min(5, Number(l.qty) || 1)
+      )
+    }))
+  };
 }
+
 function showConfirmedOrder(serverOrder,a){
   const orderItems=S.cart.map(l=>{const p=byId(l.id);return p?{id:String(p.id),size:String(l.size),qty:Math.max(1,Math.min(5,Number(l.qty)||1)),price:Number(p.price)||0,name:p.name}:null;});
   const total=Number(serverOrder.total_paise)/100;
@@ -734,143 +860,699 @@ document.addEventListener("click",e=>{
   const d=t.dataset,a=d.act;
   if(t.closest("#acctMenu"))m.hidden=true;
  
-switch(a){
-    case "home":S.f=blankF();$("#q").value="";go("home");break;
-    case "go":closeModal();go(d.view);break;
-    case "story":toAnchor("story");break;
-    case "anchor":toAnchor(d.to);break;
 
-    case "shop":{const f=blankF();if(d.cat)f.cat.add(d.cat);if(d.new)f.neu=true;if(d.q)f.q=d.q;S.f=f;$("#q").value=f.q;closeModal();go("shop");break}
-    case "product":closeModal();go("product",{pid:d.id,img:"front",size:null});break;
+switch (a) {
+  case "home":
+    S.f = blankF();
+    $("#q").value = "";
+    go("home");
+    break;
 
-    // HELP PAGE NAVIGATION
-    case "help":
-      S.helpTopic = d.topic || "shipping";
-      closeModal();
-      go("help");
+  case "go":
+    closeModal();
+    go(d.view);
+    break;
+
+  case "story":
+    toAnchor("story");
+    break;
+
+  case "anchor":
+    toAnchor(d.to);
+    break;
+
+  case "shop": {
+    const f = blankF();
+    if (d.cat) f.cat.add(d.cat);
+    if (d.new) f.neu = true;
+    if (d.q) f.q = d.q;
+    S.f = f;
+    $("#q").value = f.q;
+    closeModal();
+    go("shop");
+    break;
+  }
+
+  case "product":
+    closeModal();
+    go("product", { pid: d.id, img: "front", size: null });
+    break;
+
+  // HELP PAGE NAVIGATION
+  case "help":
+    S.helpTopic = d.topic || "shipping";
+    closeModal();
+    go("help");
+    break;
+
+  case "helpback":
+    closeModal();
+    go("home");
+    break;
+
+  case "wish": {
+    const id = String(d.id);
+    const i = S.wish.findIndex(x => String(x) === id);
+
+    if (i < 0) S.wish.push(id);
+    else S.wish.splice(i, 1);
+
+    save();
+    toast(i < 0 ? "Saved to wishlist" : "Removed from wishlist");
+
+    if (
+      (S.view === "product" && String(S.pid) === id) ||
+      S.view === "wishlist"
+    ) {
+      render();
+    } else {
+      document
+        .querySelectorAll(`.wishbtn[data-id="${id}"]`)
+        .forEach(b => {
+          const on = i < 0;
+          b.classList.toggle("on", on);
+          b.setAttribute("aria-pressed", on);
+          b.setAttribute(
+            "aria-label",
+            (on ? "Remove from" : "Add to") + " wishlist"
+          );
+        });
+    }
+
+    badges();
+    break;
+  }
+
+  case "account":
+    toggleAcct();
+    break;
+
+  case "logout":
+    S.user = null;
+    save();
+    badges();
+    toast("Logged out");
+    if (["orders", "checkout"].includes(S.view)) go("home");
+    break;
+
+  case "fset": {
+    const s = S.f[d.k];
+    s.has(d.v) ? s.delete(d.v) : s.add(d.v);
+    t.setAttribute("aria-pressed", s.has(d.v));
+    refresh();
+    break;
+  }
+
+  case "unchip": {
+    const f = S.f, k = d.k;
+
+    if (k === "q") {
+      f.q = "";
+      $("#q").value = "";
+    } else if (k === "max") {
+      f.max = 7000;
+    } else if (k === "sale" || k === "neu") {
+      f[k] = false;
+    } else {
+      f[k].delete(d.v);
+    }
+
+    render();
+    break;
+  }
+
+  case "clearf":
+    S.f = blankF();
+    $("#q").value = "";
+    render();
+    break;
+
+  case "fopen":
+    $("#filters").classList.add("open");
+    break;
+
+  case "fclose":
+    $("#filters").classList.remove("open");
+    break;
+
+  case "img":
+    S.img = d.v;
+    $("#mainimg").innerHTML = art(byId(S.pid), d.v);
+    document.querySelectorAll('[data-act="img"]').forEach(b =>
+      b.setAttribute("aria-pressed", b === t)
+    );
+    break;
+
+  case "size":
+    S.size = d.v;
+    document.querySelectorAll(".size").forEach(b =>
+      b.setAttribute("aria-pressed", b === t)
+    );
+    $("#sizeErr").textContent = "";
+    break;
+
+  case "addcart":
+    addToCart();
+    break;
+
+  case "buynow":
+    if (addToCart()) go("cart");
+    break;
+
+  case "sizechart":
+    sizeChart();
+    break;
+
+  case "checkpin": {
+    const v = $("#pin").value.trim();
+    const o = $("#pinOut");
+
+    if (!/^\d{6}$/.test(v)) {
+      o.className = "err";
+      o.textContent = "Enter a valid 6-digit PIN code.";
+    } else {
+      o.className = "ok";
+      o.innerHTML =
+        `Delivery by <b>${dateIn(Date.now(), 5)}</b> · Cash on delivery available · Free 7-day exchange`;
+    }
+    break;
+  }
+
+  case "rmline":
+    S.cart.splice(+d.i, 1);
+    save();
+    render();
+    toast("Removed from bag");
+    break;
+
+  case "movewish": {
+    const l = S.cart.splice(+d.i, 1)[0];
+
+    if (l && !S.wish.includes(l.id)) S.wish.push(l.id);
+
+    save();
+    render();
+    toast("Moved to wishlist");
+    break;
+  }
+
+  case "applycoupon":
+  case "usecoupon": {
+    const k = (d.k || $("#cin").value).trim().toUpperCase();
+    const c = COUPONS[k];
+
+    if (!c) {
+      $("#cerr").textContent = "That coupon code isn't valid.";
       break;
+    }
 
-    case "helpback":
-      closeModal();
-      go("home");
+    if (c.min && totals().price < c.min) {
+      $("#cerr").textContent =
+        `${k} needs a bag total of ${inr(c.min)} or more.`;
       break;
+    }
 
-    case "wish":{const id=String(d.id),i=S.wish.findIndex(x=>String(x)===id);i<0?S.wish.push(id):S.wish.splice(i,1);save();toast(i<0?"Saved to wishlist":"Removed from wishlist");
-      if((S.view==="product"&&String(S.pid)===id)||S.view==="wishlist")render();
-      else document.querySelectorAll(`.wishbtn[data-id="${id}"]`).forEach(b=>{const on=i<0;b.classList.toggle("on",on);b.setAttribute("aria-pressed",on);b.setAttribute("aria-label",(on?"Remove from":"Add to")+" wishlist")});badges();break}
+    S.coupon = k;
+    save();
+    render();
+    toast(k + " applied");
+    break;
+  }
 
-    case "account":toggleAcct();break;
-    case "logout":S.user=null;save();badges();toast("Logged out");if(["orders","checkout"].includes(S.view))go("home");break;
-    case "fset":{const s=S.f[d.k];s.has(d.v)?s.delete(d.v):s.add(d.v);t.setAttribute("aria-pressed",s.has(d.v));refresh();break}
-    case "unchip":{const f=S.f,k=d.k;if(k==="q"){f.q="";$("#q").value=""}else if(k==="max")f.max=7000;else if(k==="sale"||k==="neu")f[k]=false;else f[k].delete(d.v);render();break}
-    case "clearf":S.f=blankF();$("#q").value="";render();break;
-    case "fopen":$("#filters").classList.add("open");break;
-    case "fclose":$("#filters").classList.remove("open");break;
-    case "img":S.img=d.v;$("#mainimg").innerHTML=art(byId(S.pid),d.v);document.querySelectorAll('[data-act="img"]').forEach(b=>b.setAttribute("aria-pressed",b===t));break;
-    case "size":S.size=d.v;document.querySelectorAll(".size").forEach(b=>b.setAttribute("aria-pressed",b===t));$("#sizeErr").textContent="";break;
-    case "addcart":addToCart();break;
-    case "buynow":if(addToCart())go("cart");break;
-    case "sizechart":sizeChart();break;
-    case "checkpin":{const v=$("#pin").value.trim(),o=$("#pinOut");if(!/^\d{6}$/.test(v)){o.className="err";o.textContent="Enter a valid 6-digit PIN code."}else{o.className="ok";o.innerHTML=`Delivery by <b>${dateIn(Date.now(),5)}</b> · Cash on delivery available · Free 7-day exchange`}break}
-    case "rmline":S.cart.splice(+d.i,1);save();render();toast("Removed from bag");break;
-    case "movewish":{const l=S.cart.splice(+d.i,1)[0];if(!S.wish.includes(l.id))S.wish.push(l.id);save();render();toast("Moved to wishlist");break}
-    case "applycoupon":case "usecoupon":{const k=(d.k||$("#cin").value).trim().toUpperCase(),c=COUPONS[k];
-      if(!c){$("#cerr").textContent="That coupon code isn't valid.";break}
-      if(c.min&&totals().price<c.min){$("#cerr").textContent=`${k} needs a bag total of ${inr(c.min)} or more.`;break}
-      S.coupon=k;save();render();toast(k+" applied");break}
-    case "rmcoupon":S.coupon=null;save();render();break;
-    case "sampleaddr":[["a-line","B-12, Chandni Residency, Hazratganj"],["a-area","Hazratganj"],["a-pin","226001"],["a-city","Lucknow"],["a-state","Uttar Pradesh"]].forEach(([i,v])=>$("#"+i).value=v);break;
-    case "placeorder":placeOrder();break;
-    case "cancel":{const o=S.orders.find(x=>x.id===d.id);o.cancelled=true;save();render();toast("Order cancelled");break}
-    case "reorder":{const o=S.orders.find(x=>x.id===d.id);o.items.forEach(l=>{const c=S.cart.find(x=>x.id===l.id&&x.size===l.size);c?c.qty=Math.min(5,c.qty+l.qty):S.cart.push({id:l.id,size:l.size,qty:l.qty})});save();go("cart");break}
-    case "sendotp":{const v=$("#ph").value.replace(/\D/g,"");if(!/^[6-9]\d{9}$/.test(v)){$("#lerr").textContent="Enter a valid 10-digit mobile number.";break}S.login={step:"otp",phone:v};paintLogin();toast("OTP sent (demo: 1234)");break}
-    case "editphone":S.login.step="phone";paintLogin();break;
-    case "verifyotp":{const v=[...document.querySelectorAll(".od")].map(i=>i.value).join("");if(v!=="1234"){$("#lerr").textContent="Incorrect OTP. For this demo, use 1234.";break}
-      const prev=load("user",null);if(prev&&prev.phone===S.login.phone)loginDone(prev.name);else{S.login.step="name";paintLogin()}break}
-    case "savename":{const v=$("#nm").value.trim();if(v.length<2){$("#lerr").textContent="Enter your name.";break}loginDone(v);break}
-    case "mclose":closeModal();break;
+  case "rmcoupon":
+    S.coupon = null;
+    save();
+    render();
+    break;
+
+  case "sampleaddr":
+    [
+      ["a-line", "B-12, Chandni Residency, Hazratganj"],
+      ["a-area", "Hazratganj"],
+      ["a-pin", "226001"],
+      ["a-city", "Lucknow"],
+      ["a-state", "Uttar Pradesh"]
+    ].forEach(([i, v]) => $("#" + i).value = v);
+    break;
+
+  // COD CHECKOUT
+  case "placeorder":
+    placeOrder();
+    break;
+
+  // WHATSAPP CHECKOUT
+  case "whatsapporder":
+    startWhatsAppOrder();
+    break;
+
+  case "cancel": {
+    const o = S.orders.find(x => x.id === d.id);
+    if (!o) break;
+
+    o.cancelled = true;
+    save();
+    render();
+    toast("Order cancelled");
+    break;
+  }
+
+  case "reorder": {
+    const o = S.orders.find(x => x.id === d.id);
+    if (!o) break;
+
+    o.items.forEach(l => {
+      const c = S.cart.find(
+        x => x.id === l.id && x.size === l.size
+      );
+
+      if (c) c.qty = Math.min(5, c.qty + l.qty);
+      else S.cart.push({ id: l.id, size: l.size, qty: l.qty });
+    });
+
+    save();
+    go("cart");
+    break;
+  }
+
+  case "sendotp": {
+    const v = $("#ph").value.replace(/\D/g, "");
+
+    if (!/^[6-9]\d{9}$/.test(v)) {
+      $("#lerr").textContent = "Enter a valid 10-digit mobile number.";
+      break;
+    }
+
+    S.login = { step: "otp", phone: v };
+    paintLogin();
+    toast("OTP sent (demo: 1234)");
+    break;
+  }
+
+  case "editphone":
+    S.login.step = "phone";
+    paintLogin();
+    break;
+
+  case "verifyotp": {
+    const v = [...document.querySelectorAll(".od")]
+      .map(i => i.value)
+      .join("");
+
+    if (v !== "1234") {
+      $("#lerr").textContent =
+        "Incorrect OTP. For this demo, use 1234.";
+      break;
+    }
+
+    const prev = load("user", null);
+
+    if (prev && prev.phone === S.login.phone) {
+      loginDone(prev.name);
+    } else {
+      S.login.step = "name";
+      paintLogin();
+    }
+    break;
+  }
+
+  case "savename": {
+    const v = $("#nm").value.trim();
+
+    if (v.length < 2) {
+      $("#lerr").textContent = "Enter your name.";
+      break;
+    }
+
+    loginDone(v);
+    break;
+  }
+
+  case "mclose":
+    closeModal();
+    break;
+
+  }
+});
+document.addEventListener("change", e => {
+  const t = e.target;
+
+  if (t.dataset.f) {
+    const k = t.dataset.f;
+
+    if (k === "cat" || k === "fabric") {
+      t.checked ? S.f[k].add(t.value) : S.f[k].delete(t.value);
+    } else {
+      S.f[k] = t.checked;
+    }
+
+    refresh();
+  } else if (t.id === "sort") {
+    S.f.sort = t.value;
+    refresh();
+  } else if (t.dataset.cs !== undefined) {
+    const index = Number(t.dataset.cs);
+    const l = S.cart[index];
+    const p = l && byId(l.id);
+
+    if (!l || !p) return;
+
+    const size = String(t.value);
+    const stock =
+      p.stock_by_size && p.stock_by_size[size] != null
+        ? Math.max(0, Number(p.stock_by_size[size]) || 0)
+        : 5;
+
+    if (
+      (Array.isArray(p.sold) && p.sold.some(sz => String(sz) === size)) ||
+      stock < 1
+    ) {
+      toast("That size is out of stock.");
+      render();
+      return;
+    }
+
+    const dup = S.cart.find(
+      x =>
+        x !== l &&
+        String(x.id) === String(l.id) &&
+        String(x.size) === size
+    );
+
+    if (dup) {
+      dup.qty = Math.min(
+        5,
+        stock,
+        (Number(dup.qty) || 1) + (Number(l.qty) || 1)
+      );
+      S.cart.splice(index, 1);
+    } else {
+      l.size = size;
+    }
+
+    save();
+    render();
+  } else if (t.dataset.cq !== undefined) {
+    const index = Number(t.dataset.cq);
+    const l = S.cart[index];
+    const p = l && byId(l.id);
+
+    if (!l || !p) return;
+
+    const stock =
+      p.stock_by_size && p.stock_by_size[l.size] != null
+        ? Math.max(0, Number(p.stock_by_size[l.size]) || 0)
+        : 5;
+
+    if (
+      stock < 1 ||
+      (Array.isArray(p.sold) &&
+        p.sold.some(sz => String(sz) === String(l.size)))
+    ) {
+      toast("This size is out of stock.");
+      return;
+    }
+
+    l.qty = Math.max(1, Math.min(5, stock, Number(t.value) || 1));
+    save();
+    render();
+  } else if (t.name === "pay") {
+    // Keep the existing payment selection behavior.
+    // Checkout currently defaults to COD.
+    const keep = [
+      "a-name",
+      "a-phone",
+      "a-email",
+      "a-line",
+      "a-area",
+      "a-pin",
+      "a-city",
+      "a-state"
+    ].map(id => {
+      const el = $("#" + id);
+      return [id, el ? el.value : ""];
+    });
+
+    S.pay = "cod";
+    render();
+
+    keep.forEach(([id, value]) => {
+      const el = $("#" + id);
+      if (el) el.value = value;
+    });
   }
 });
 
-document.addEventListener("change",e=>{
-  const t=e.target;
-  if(t.dataset.f){const k=t.dataset.f;if(k==="cat"||k==="fabric"){t.checked?S.f[k].add(t.value):S.f[k].delete(t.value)}else S.f[k]=t.checked;refresh()}
-  else if(t.id==="sort"){S.f.sort=t.value;refresh()}
-  else if(t.dataset.cs!==undefined){
-    const index=Number(t.dataset.cs),l=S.cart[index],p=l&&byId(l.id);
-    if(!l||!p)return;
-    const dup=S.cart.find(x=>x!==l&&String(x.id)===String(l.id)&&String(x.size)===String(t.value));
-    if(dup){const stock=(p.stock_by_size&&p.stock_by_size[t.value]!=null)?Math.max(0,Number(p.stock_by_size[t.value])||0):5;dup.qty=Math.min(5,stock||5,(Number(dup.qty)||1)+(Number(l.qty)||1));S.cart.splice(index,1)}
-    else if(Array.isArray(p.sold)&&p.sold.some(sz=>String(sz)===String(t.value))){toast("That size is out of stock.");}
-    else l.size=String(t.value);
-    save();render();
-  }
-  else if(t.dataset.cq!==undefined){
-    const index=Number(t.dataset.cq),l=S.cart[index],p=l&&byId(l.id);if(!l||!p)return;
-    const stock=(p.stock_by_size&&p.stock_by_size[l.size]!=null)?Math.max(0,Number(p.stock_by_size[l.size])||0):5;
-    if(stock<1||(Array.isArray(p.sold)&&p.sold.some(sz=>String(sz)===String(l.size)))){toast("This size is out of stock.");return;}
-    l.qty=Math.max(1,Math.min(5,stock,Number(t.value)||1));save();render();
-  }
-  else if(t.name==="pay"){const keep=["a-name","a-phone","a-email","a-line","a-area","a-pin","a-city","a-state"].map(i=>[i,$("#"+i).value]);S.pay=t.value;render();keep.forEach(([i,v])=>$("#"+i).value=v)}
-});
-document.addEventListener("input",e=>{
-  const t=e.target;
-  if(t.id==="price"){S.f.max=+t.value;$("#priceLbl").textContent="Up to "+inr(S.f.max);refresh()}
-  else if(t.id==="q")suggest(t.value);
-  else if(t.classList.contains("od")&&t.value){const n=t.nextElementSibling;if(n&&n.classList.contains("od"))n.focus()}
-  else if(t.id==="cno"){t.value=t.value.replace(/\D/g,"").slice(0,16).replace(/(\d{4})(?=\d)/g,"$1 ")}
-});
-document.addEventListener("keydown",e=>{
-  if(e.key==="Escape"){closeModal();$("#acctMenu").hidden=true;$("#sugg").hidden=true}
-  if(e.key==="Backspace"&&e.target.classList.contains("od")&&!e.target.value){const p=e.target.previousElementSibling;if(p)p.focus()}
-  if(e.key==="Enter"){
-    const click=s=>{const b=document.querySelector(s);if(b)b.click()};
-    if(e.target.id==="q"){e.preventDefault();doSearch(e.target.value)}
-    else if(e.target.id==="ph")click('[data-act="sendotp"]');
-    else if(e.target.classList.contains("od"))click('[data-act="verifyotp"]');
-    else if(e.target.id==="nm")click('[data-act="savename"]');
-    else if(e.target.id==="cin")click('[data-act="applycoupon"]');
-    else if(e.target.id==="pin")click('[data-act="checkpin"]');
+document.addEventListener("input", e => {
+  const t = e.target;
+
+  if (t.id === "price") {
+    S.f.max = +t.value;
+    $("#priceLbl").textContent = "Up to " + inr(S.f.max);
+    refresh();
+  } else if (t.id === "q") {
+    suggest(t.value);
+  } else if (t.classList.contains("od") && t.value) {
+    const n = t.nextElementSibling;
+    if (n && n.classList.contains("od")) n.focus();
+  } else if (t.id === "cno") {
+    t.value = t.value
+      .replace(/\D/g, "")
+      .slice(0, 16)
+      .replace(/(\d{4})(?=\d)/g, "$1 ");
   }
 });
-function doSearch(q){$("#sugg").hidden=true;const f=blankF();f.q=q.trim();S.f=f;go("shop");$("#q").blur()}
-function suggest(v){
-  const box=$("#sugg"),q=v.trim().toLowerCase();
-  if(!q){box.hidden=true;return}
-  const cats=CATS.map(c=>c[0]).filter(c=>c.toLowerCase().includes(q)).slice(0,2);
-  const prods=P.filter(p=>(p.name+" "+p.colour+" "+p.cat+" "+p.stitch+" "+p.fabric).toLowerCase().includes(q)).slice(0,5);
-  box.innerHTML=(!cats.length&&!prods.length)?`<button data-act="shop" data-q="${esc(v)}">Search for “${esc(v)}”</button>`:
-    cats.map(c=>`<button data-act="shop" data-cat="${esc(c)}"><b>${esc(c)}</b><small>Silhouette</small></button>`).join("")+prods.map(p=>`<button data-act="product" data-id="${p.id}"><span class="s-art">${art(p)}</span>${p.name}<small>${inr(p.price)}</small></button>`).join("")+`<button data-act="shop" data-q="${esc(v)}">See all results for “${esc(v)}”</button>`;
-  box.hidden=false;
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    closeModal();
+    $("#acctMenu").hidden = true;
+    $("#sugg").hidden = true;
+  }
+
+  if (
+    e.key === "Backspace" &&
+    e.target.classList.contains("od") &&
+    !e.target.value
+  ) {
+    const p = e.target.previousElementSibling;
+    if (p) p.focus();
+  }
+
+  if (e.key === "Enter") {
+    const click = selector => {
+      const b = document.querySelector(selector);
+      if (b) b.click();
+    };
+
+    if (e.target.id === "q") {
+      e.preventDefault();
+      doSearch(e.target.value);
+    } else if (e.target.id === "ph") {
+      click('[data-act="sendotp"]');
+    } else if (e.target.classList.contains("od")) {
+      click('[data-act="verifyotp"]');
+    } else if (e.target.id === "nm") {
+      click('[data-act="savename"]');
+    } else if (e.target.id === "cin") {
+      click('[data-act="applycoupon"]');
+    } else if (e.target.id === "pin") {
+      click('[data-act="checkpin"]');
+    }
+  }
+});
+
+function doSearch(q) {
+  $("#sugg").hidden = true;
+  const f = blankF();
+  f.q = q.trim();
+  S.f = f;
+  go("shop");
+  $("#q").blur();
 }
 
-/* Supabase product loader — compatible with the actual Label Awadh products schema */
-window.LabelAwadhLoadProducts = function (rows) {
-  if (!Array.isArray(rows) || rows.length === 0) {
-    console.warn("Label Awadh: no product rows received; keeping current catalogue.");
+function suggest(v) {
+  const box = $("#sugg");
+  const q = v.trim().toLowerCase();
+
+  if (!q) {
+    box.hidden = true;
     return;
   }
-  const categoryMap = {"Kurtas":"kurta","Short Kurtis":"short","Kurta Sets":"set","Anarkalis":"anarkali","Dupattas":"dupatta","Sarees":"saree","Chikankari Suits":"kurta"};
-  const palette = ["#F2EBDD","#E8C5C1","#C3DACB","#F8F6F1","#BDD1E0","#EAC55C","#C2A1B3","#D9C3A5"];
-  const mapped = rows.filter(row => row && row.id != null && row.active !== false).map((row, i) => {
-    const rawPrice = row.price_paise != null ? Number(row.price_paise) / 100 : Number(row.price ?? 0);
-    const rawMrp = row.compare_at_price_paise != null ? Number(row.compare_at_price_paise) / 100 : Number(row.compare_at_price ?? rawPrice);
-    const images = Array.isArray(row.image_urls) ? row.image_urls.filter(url => typeof url === "string" && url.trim()) : (row.image_url ? [row.image_url] : (Array.isArray(row.images) ? row.images : []));
-    const stock = row.stock_by_size && typeof row.stock_by_size === "object" ? row.stock_by_size : {};
-    const sizes = Array.isArray(row.sizes) ? row.sizes.map(s => String(s).trim()).filter(Boolean) : (typeof row.sizes === "string" ? row.sizes.split(",").map(s => s.trim()).filter(Boolean) : ["S","M","L","XL"]);
-    const free = sizes.length === 1 && sizes[0].toLowerCase().startsWith("free");
-    // Treat a size as sold out only when inventory explicitly reports zero. Missing stock_by_size data must not disable every size.
-    const sold = free ? [] : sizes.filter(size => stock[size] != null && Number(stock[size]) <= 0);
-    const cat = row.category || "Chikankari Suits";
-    const colour = row.colour || row.color || "Ivory";
-    const price = Number.isFinite(rawPrice) ? rawPrice : 0;
-    const mrp = Number.isFinite(rawMrp) && rawMrp >= price ? rawMrp : price;
-    return {id:String(row.id),slug:row.slug||"",name:row.name||"Chikankari Collection",cat,category:cat,shape:categoryMap[cat]||"kurta",colour,color:colour,hex:row.hex||palette[i%palette.length],thread:row.thread||"#BFAE90",fabric:row.fabric||"Chikankari fabric",stitch:row.stitch||"Hand embroidery",days:Number(row.days)||14,price,mrp,rating:Number(row.rating)||5,reviews:Number(row.reviews)||0,sold,tag:row.tag||"",fit:row.fit||"Handcrafted fit",desc:row.description||row.desc||"Hand-embroidered chikankari piece.",description:row.description||row.desc||"",image_urls:images,image_url:images[0]||"",images,sizes:free?["Free size"]:(sizes.length?sizes:["S","M","L","XL"]),free,stock_by_size:stock,stock:Object.values(stock).reduce((sum,value)=>sum+Math.max(0,Number(value)||0),0),active:row.active!==false};
-  });
-  if (!mapped.length) { console.warn("Label Awadh: no valid active products received; keeping current catalogue."); return; }
+
+  const cats = CATS.map(c => c[0])
+    .filter(c => c.toLowerCase().includes(q))
+    .slice(0, 2);
+
+  const prods = P.filter(p =>
+    (
+      p.name +
+      " " +
+      p.colour +
+      " " +
+      p.cat +
+      " " +
+      p.stitch +
+      " " +
+      p.fabric
+    ).toLowerCase().includes(q)
+  ).slice(0, 5);
+
+  box.innerHTML =
+    !cats.length && !prods.length
+      ? `<button data-act="shop" data-q="${esc(v)}">Search for “${esc(v)}”</button>`
+      : cats
+          .map(
+            c =>
+              `<button data-act="shop" data-cat="${esc(c)}"><b>${esc(c)}</b><small>Silhouette</small></button>`
+          )
+          .join("") +
+        prods
+          .map(
+            p =>
+              `<button data-act="product" data-id="${p.id}"><span class="s-art">${art(p)}</span>${esc(p.name)}<small>${inr(p.price)}</small></button>`
+          )
+          .join("") +
+        `<button data-act="shop" data-q="${esc(v)}">See all results for “${esc(v)}”</button>`;
+
+  box.hidden = false;
+}
+
+/* Supabase product loader — compatible with the existing products schema */
+window.LabelAwadhLoadProducts = function (rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    console.warn(
+      "Label Awadh: no product rows received; keeping current catalogue."
+    );
+    return;
+  }
+
+  const categoryMap = {
+    "Kurtas": "kurta",
+    "Short Kurtis": "short",
+    "Kurta Sets": "set",
+    "Anarkalis": "anarkali",
+    "Dupattas": "dupatta",
+    "Sarees": "saree",
+    "Chikankari Suits": "kurta"
+  };
+
+  const palette = [
+    "#F2EBDD",
+    "#E8C5C1",
+    "#C3DACB",
+    "#F8F6F1",
+    "#BDD1E0",
+    "#EAC55C",
+    "#C2A1B3",
+    "#D9C3A5"
+  ];
+
+  const mapped = rows
+    .filter(row => row && row.id != null && row.active !== false)
+    .map((row, i) => {
+      const rawPrice =
+        row.price_paise != null
+          ? Number(row.price_paise) / 100
+          : Number(row.price ?? 0);
+
+      const rawMrp =
+        row.compare_at_price_paise != null
+          ? Number(row.compare_at_price_paise) / 100
+          : Number(row.compare_at_price ?? rawPrice);
+
+      const images = Array.isArray(row.image_urls)
+        ? row.image_urls.filter(
+            url => typeof url === "string" && url.trim()
+          )
+        : row.image_url
+          ? [row.image_url]
+          : Array.isArray(row.images)
+            ? row.images
+            : [];
+
+      const stock =
+        row.stock_by_size && typeof row.stock_by_size === "object"
+          ? row.stock_by_size
+          : {};
+
+      const sizes = Array.isArray(row.sizes)
+        ? row.sizes.map(s => String(s).trim()).filter(Boolean)
+        : typeof row.sizes === "string"
+          ? row.sizes.split(",").map(s => s.trim()).filter(Boolean)
+          : ["S", "M", "L", "XL"];
+
+      const free =
+        sizes.length === 1 && sizes[0].toLowerCase().startsWith("free");
+
+      const sold = free
+        ? []
+        : sizes.filter(
+            size => stock[size] != null && Number(stock[size]) <= 0
+          );
+
+      const cat = row.category || "Chikankari Suits";
+      const colour = row.colour || row.color || "Ivory";
+      const price = Number.isFinite(rawPrice) ? rawPrice : 0;
+      const mrp =
+        Number.isFinite(rawMrp) && rawMrp >= price ? rawMrp : price;
+
+      return {
+        id: String(row.id),
+        slug: row.slug || "",
+        name: row.name || "Chikankari Collection",
+        cat,
+        category: cat,
+        shape: categoryMap[cat] || "kurta",
+        colour,
+        color: colour,
+        hex: row.hex || palette[i % palette.length],
+        thread: row.thread || "#BFAE90",
+        fabric: row.fabric || "Chikankari fabric",
+        stitch: row.stitch || "Hand embroidery",
+        days: Number(row.days) || 14,
+        price,
+        mrp,
+        rating: Number(row.rating) || 5,
+        reviews: Number(row.reviews) || 0,
+        sold,
+        tag: row.tag || "",
+        fit: row.fit || "Handcrafted fit",
+        desc: row.description || row.desc || "Hand-embroidered chikankari piece.",
+        description: row.description || row.desc || "",
+        image_urls: images,
+        image_url: images[0] || "",
+        images,
+        sizes: free
+          ? ["Free size"]
+          : sizes.length
+            ? sizes
+            : ["S", "M", "L", "XL"],
+        free,
+        stock_by_size: stock,
+        stock: Object.values(stock).reduce(
+          (sum, value) => sum + Math.max(0, Number(value) || 0),
+          0
+        ),
+        active: row.active !== false
+      };
+    });
+
+  if (!mapped.length) {
+    console.warn(
+      "Label Awadh: no valid active products received; keeping current catalogue."
+    );
+    return;
+  }
+
   P.splice(0, P.length, ...mapped);
-  S.cart = (Array.isArray(S.cart) ? S.cart : []).map(item => ({...item,id:String(item.id)}));
+
+  S.cart = (Array.isArray(S.cart) ? S.cart : []).map(item => ({
+    ...item,
+    id: String(item.id)
+  }));
+
   S.wish = (Array.isArray(S.wish) ? S.wish : []).map(id => String(id));
+
   save();
   render();
 };
