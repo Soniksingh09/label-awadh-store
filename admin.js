@@ -2,7 +2,16 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const $ = (id) => document.getElementById(id);
 const configured = window.LABEL_AWADH_SUPABASE_URL?.startsWith('https://') && !window.LABEL_AWADH_SUPABASE_URL.includes('PASTE_') && window.LABEL_AWADH_SUPABASE_KEY && !window.LABEL_AWADH_SUPABASE_KEY.includes('PASTE_');
 let supabase = null, currentTab = 'overview';
-const statusOptions = ['pending','confirmed','processing','shipped','delivered','cancelled'];
+const statusOptions = [
+  'pending',
+  'confirmed',
+  'packed',
+  'processing',
+  'shipped',
+  'out_for_delivery',
+  'delivered',
+  'cancelled'
+];
 if (!configured) { $('setupNotice').classList.remove('hidden'); $('setupNotice').innerHTML = '<b>Setup required:</b> open <code>public/admin/config.js</code> and add your Supabase Project URL and publishable/anon key. Then redeploy the site. Never use a service_role key here.'; $('connectionState').textContent = 'Setup required'; }
 else { supabase = createClient(window.LABEL_AWADH_SUPABASE_URL, window.LABEL_AWADH_SUPABASE_KEY); $('connectionState').textContent = 'Configured'; }
 function money(paise){return new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format((Number(paise)||0)/100)}
