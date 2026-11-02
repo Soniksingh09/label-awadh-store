@@ -610,7 +610,7 @@ function showConfirmedOrder(serverOrder,a){
   const orderItems=S.cart.map(l=>{const p=byId(l.id);return p?{id:String(p.id),size:String(l.size),qty:Math.max(1,Math.min(5,Number(l.qty)||1)),price:Number(p.price)||0,name:p.name}:null;});
   const total=Number(serverOrder.total_paise)/100;
   const o={id:String(serverOrder.order_number||serverOrder.order_id),serverId:serverOrder.order_id,date:Date.now(),items:orderItems.filter(Boolean),total,save:(Number(serverOrder.discount_paise)||0)/100,coupon:S.coupon,pay:S.pay==="cod"?"Cash on delivery":"Online payment",addr:a,status:serverOrder.status||"pending"};
-  S.addr=a;S.orders.unshift(o);S.cart=[];S.coupon=null;S.lastOrder=o.id;save();go("success");sendOrderToWhatsApp(o);
+  S.addr=a;S.orders.unshift(o);S.cart=[];S.coupon=null;S.lastOrder=o.id;save();go("success");
 }
 async function placeOrder(){
   const a=readAddr(),e=$("#coErr");e.textContent="";
@@ -812,6 +812,148 @@ function vHelp(){
 
 
 
+/* ---------- Supabase browser authentication ---------- */
+// Uses the public project URL/key also used by the checkout Edge Function.
+// LABEL_AWADH_SUPABASE_KEY must be the anon/publishable key, NEVER service_role.
+let labelAwadhAuthClient = null;
+let labelAwadhSupabaseLibraryPromise = null;
+
+async function getSupabaseAuthClient() {
+  if (labelAwadhAuthClient) return labelAwadhAuthClient;
+
+  const url = String(window.LABEL_AWADH_SUPABASE_URL || "").replace(/\/$/, "");
+  const key = String(window.LABEL_AWADH_SUPABASE_KEY || "");
+
+  if (!url || !key) {
+    throw new Error("Supabase is not configured. Add LABEL_AWADH_SUPABASE_URL and the public anon/publishable LABEL_AWADH_SUPABASE_KEY in public/index.html.");
+  }
+
+  if (!window.supabase || typeof window.supabase.createClient !== "function") {
+    if (!labelAwadhSupabaseLibraryPromise) {
+      labelAwadhSupabaseLibraryPromise = new Promise((resolve, reject) => {
+        const existing = document.querySelector('script[data-label-awadh-supabase="true"]');
+        if (existing) {
+          existing.addEventListener("load", resolve, { once: true });
+          existing.addEventListener("error", () => reject(new Error("Could not load Supabase library.")), { once: true });
+          return;
+        }
+        const script = document.createElement("script");
+        script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js";
+        script.async = true;
+        script.dataset.labelAwadhSupabase = "true";
+        script.onload = resolve;
+        script.onerror = () => reject(new Error("Could not load Supabase library. Check your internet connection."));
+        document.head.appendChild(script);
+      });
+    }
+    await labelAwadhSupabaseLibraryPromise;
+  }
+
+  if (!window.supabase || typeof window.supabase.createClient !== "function") {
+    throw new Error("Supabase library loaded, but createClient() is unavailable.");
+  }
+
+  labelAwadhAuthClient = window.supabase.createClient(url, key, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+  });
+  return labelAwadhAuthClient;
+}
+
+/* ---------- real Supabase OTP ---------- */
+async function sendRealOTP() {
+  const phone = ($("#ph")?.value || "").replace(/\D/g, "");
+  const errorBox = $("#lerr");
+
+  if (!/^[6-9]\d{9}$/.test(phone)) {
+    if (errorBox) errorBox.textContent = "Please enter a valid 10-digit mobile number.";
+    return;
+  }
+
+  const button = document.querySelector('[data-act="sendotp"]');
+  if (button) { button.disabled = true; button.textContent = "Sending OTP…"; }
+  S.login.phone = phone;
+
+  try {
+    const client = await getSupabaseAuthClient();
+    const { error } = await client.auth.signInWithOtp({ phone: "+91" + phone });
+    if (error) throw error;
+    S.login.step = "otp";
+    paintLogin();
+    toast("OTP sent successfully");
+  } catch (error) {
+    if (errorBox) errorBox.textContent = error.message || "Unable to send OTP. Please try again.";
+    if (button) { button.disabled = false; button.textContent = "Send OTP"; }
+  }
+}
+
+async function verifyRealOTP() {
+  const otp = [...document.querySelectorAll(".od")].map(input => input.value.trim()).join("");
+  const errorBox = $("#lerr");
+
+  if (!/^\d{6}$/.test(otp)) {
+    if (errorBox) errorBox.textContent = "Please enter the complete 6-digit OTP.";
+    return;
+  }
+
+  const button = document.querySelector('[data-act="verifyotp"]');
+  if (button) { button.disabled = true; button.textContent = "Verifying…"; }
+
+  try {
+    const client = await getSupabaseAuthClient();
+    const { data, error } = await client.auth.verifyOtp({
+      phone: "+91" + S.login.phone, token: otp, type: "sms"
+    });
+    if (error) throw error;
+
+    const previousUser = load("user", null);
+    const savedName = data.user?.user_metadata?.name ||
+      (previousUser && previousUser.phone === S.login.phone ? previousUser.name : "");
+
+    if (savedName) {
+      loginDone(savedName);
+    } else {
+      S.login.step = "name";
+      paintLogin();
+    }
+  } catch (error) {
+    if (errorBox) errorBox.textContent = error.message || "Invalid OTP. Please try again.";
+    if (button) { button.disabled = false; button.textContent = "Verify & continue"; }
+  }
+}
+
+async function saveCustomerName() {
+  const name = ($("#nm")?.value || "").trim();
+  const errorBox = $("#lerr");
+  if (name.length < 2) {
+    if (errorBox) errorBox.textContent = "Enter your name.";
+    return;
+  }
+
+  try {
+    const client = await getSupabaseAuthClient();
+    const { error } = await client.auth.updateUser({ data: { name } });
+    if (error) throw error;
+    loginDone(name);
+  } catch (error) {
+    if (errorBox) errorBox.textContent = error.message || "Could not save your name. Please try again.";
+  }
+}
+
+async function logoutFromSupabase() {
+  try {
+    const client = await getSupabaseAuthClient();
+    const { error } = await client.auth.signOut();
+    if (error) throw error;
+    S.user = null;
+    save();
+    badges();
+    toast("Logged out");
+    if (["orders", "checkout"].includes(S.view)) go("home");
+  } catch (error) {
+    toast(error.message || "Could not log out. Please try again.");
+  }
+}
+
 /* ---------- modals ---------- */
 let lastFocus=null;
 function openModal(html,wide){lastFocus=document.activeElement;$("#mbox").className="mbox"+(wide?" wide":"");$("#mbox").innerHTML=`<button class="x" data-act="mclose" aria-label="Close">×</button>`+html;$("#modal").hidden=false;const f=$("#mbox input")||$("#mbox .x");f&&f.focus()}
@@ -822,9 +964,9 @@ function paintLogin(){
   if(L.step==="phone")openModal(`${MARK}<h2>Welcome to Label Awadh</h2><p class="muted">Login or sign up with your mobile number. We'll send a one-time password.</p>
     <div class="phone"><span>+91</span><input id="ph" inputmode="numeric" maxlength="10" placeholder="10-digit mobile number" aria-label="Mobile number" value="${esc(L.phone)}"></div><div class="err" id="lerr"></div>
     <button class="btn block" data-act="sendotp">Send OTP</button><p class="muted" style="font-size:12px">By continuing you agree to our Terms of Use and Privacy Policy.</p>`);
-  else if(L.step==="otp")openModal(`<div class="eyebrow">Verify</div><h2>Enter OTP</h2><p class="muted">Sent to +91 ${esc(L.phone)} · <button class="link" data-act="editphone">Change</button></p>
-    <div class="otp">${[0,1,2,3].map(i=>`<input class="od" inputmode="numeric" maxlength="1" aria-label="OTP digit ${i+1}">`).join("")}</div>
-    <div class="note">Demo OTP: <b>1234</b></div><div class="err" id="lerr"></div><button class="btn block" data-act="verifyotp">Verify &amp; continue</button>`);
+  else if(L.step==="otp")openModal(`<div class="eyebrow">Verify your number</div><h2>Enter OTP</h2><p class="muted">Sent to +91 ${esc(L.phone)} · <button class="link" data-act="editphone">Change</button></p>
+    <div class="otp">${[0,1,2,3,4,5].map(i=>`<input class="od" inputmode="numeric" maxlength="1" aria-label="OTP digit ${i+1}">`).join("")}</div>
+    <div class="err" id="lerr"></div><button class="btn block" data-act="verifyotp">Verify &amp; continue</button>`);
   else openModal(`<div class="eyebrow">Almost done</div><h2>What's your name?</h2><label class="field">Full name<input id="nm" placeholder="Your full name" autocomplete="name"></label><div class="err" id="lerr"></div><button class="btn block" data-act="savename">Continue</button>`);
 }
 
@@ -833,7 +975,6 @@ function paintLogin(){
 
 function loginDone(name){
   S.user={phone:S.login.phone,name};
-  if(!S.orders.length)S.orders.push({id:"LA48213077",date:Date.now()-14*864e5,sample:true,items:[{id:1,size:"M",qty:1,price:2450},{id:8,size:"Free size",qty:1,price:1450}],total:3900,save:850,pay:"UPI",addr:{name,city:"Lucknow"}});
   save();badges();closeModal();toast("Logged in as "+name);
   const a=S.after;S.after=null;if(a)a();else if(S.view==="orders")render();
 }
@@ -948,11 +1089,7 @@ switch (a) {
     break;
 
   case "logout":
-    S.user = null;
-    save();
-    badges();
-    toast("Logged out");
-    if (["orders", "checkout"].includes(S.view)) go("home");
+    logoutFromSupabase();
     break;
 
   case "fset": {
@@ -1135,47 +1272,21 @@ switch (a) {
   }
 
  case "sendotp":
-  sendRealOTP();
-  break;
+    sendRealOTP();
+    break;
 
   case "editphone":
     S.login.step = "phone";
     paintLogin();
     break;
 
-  case "verifyotp": {
-    const v = [...document.querySelectorAll(".od")]
-      .map(i => i.value)
-      .join("");
-
-    if (v !== "1234") {
-      $("#lerr").textContent =
-        "Incorrect OTP. For this demo, use 1234.";
-      break;
-    }
-
-    const prev = load("user", null);
-
-    if (prev && prev.phone === S.login.phone) {
-      loginDone(prev.name);
-    } else {
-      S.login.step = "name";
-      paintLogin();
-    }
+  case "verifyotp":
+    verifyRealOTP();
     break;
-  }
 
-  case "savename": {
-    const v = $("#nm").value.trim();
-
-    if (v.length < 2) {
-      $("#lerr").textContent = "Enter your name.";
-      break;
-    }
-
-    loginDone(v);
+  case "savename":
+    saveCustomerName();
     break;
-  }
 
   case "mclose":
     closeModal();
