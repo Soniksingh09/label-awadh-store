@@ -3,7 +3,16 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 const URL = (import.meta.env.VITE_SUPABASE_URL || window.LABEL_AWADH_SUPABASE_URL || '').replace(/\/$/, '');
 const KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || window.LABEL_AWADH_SUPABASE_KEY || '';
 const money = (paise) => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format((Number(paise)||0)/100);
-const statuses = ['pending','confirmed','processing','shipped','delivered','cancelled'];
+const statuses = [
+  'pending',
+  'confirmed',
+  'packed',
+  'processing',
+  'shipped',
+  'out_for_delivery',
+  'delivered',
+  'cancelled'
+];
 const blank = { id:'', name:'', slug:'', description:'', category:'Chikankari Suits', price:'', compare:'', image_urls:'', sizes:'S, M, L, XL', stockS:'0', stockM:'0', stockL:'0', stockXL:'0', active:true };
 
 async function api(path, { token, method='GET', body, prefer } = {}) {
