@@ -94,7 +94,47 @@ export default function Admin() {
     } catch(e){setError(e.message)} finally{setBusy(false)}
   }
   async function deleteProduct(p){if(!window.confirm(`Delete “${p.name}”?`))return;setBusy(true);setError('');setNotice('');try{await api(`/rest/v1/products?id=eq.${encodeURIComponent(p.id)}`,{token,method:'DELETE'});await loadProducts();setNotice('Product deleted.')}catch(e){setError(e.message)}finally{setBusy(false)}}
-  async function updateOrder(id,status){setBusy(true);setError('');setNotice('');try{await api(`/rest/v1/orders?id=eq.${encodeURIComponent(id)}`,{token,method:'PATCH',body:{status,updated_at:new Date().toISOString()},prefer:'return=representation'});await loadOrders();setNotice(`Order status updated to ${status}.`)}catch(e){setError(e.message)}finally{setBusy(false)}}
+
+async function updateOrder(id, status) {
+  setBusy(true);
+  setError('');
+  setNotice('');
+
+  try {
+    const result = await api(
+      '/functions/v1/admin-update-order',
+      {
+        token,
+        method: 'POST',
+        body: {
+          order_id: id,
+          status: status
+        }
+      }
+    );
+
+    await loadOrders();
+
+    if (status === 'cancelled') {
+      const restoration = result.stock_restoration;
+
+      if (restoration?.restored) {
+        setNotice('Order cancelled and stock restored successfully.');
+      } else if (restoration?.already_restored) {
+        setNotice('Order is cancelled. Stock was already restored.');
+      } else {
+        setNotice('Order cancelled. No stock restoration was needed.');
+      }
+    } else {
+      setNotice(`Order status updated to ${status}.`);
+    }
+
+  } catch (e) {
+    setError(e.message);
+  } finally {
+    setBusy(false);
+  }
+}
   async function toggleItems(orderId){if(itemsByOrder[orderId]){setItemsByOrder(v=>{const n={...v};delete n[orderId];return n});return;}try{const rows=await api(`/rest/v1/order_items?select=*&order_id=eq.${encodeURIComponent(orderId)}`,{token});setItemsByOrder(v=>({...v,[orderId]:rows||[]}));}catch(e){setError(e.message)}}
 
   const filtered=useMemo(()=>products.filter(p=>`${p.name} ${p.category} ${p.slug}`.toLowerCase().includes(search.toLowerCase())),[products,search]);
